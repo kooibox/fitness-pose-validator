@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# Database (runtime data - not tracked)
+fitness_data.db
+data/fitness_data.db
+*.sqlite
+*.sqlite3
+
+# MediaPipe models (keep project model, ignore others)
+# models/pose_landmarker.task - tracked
+*.task
+!models/*.task
+
+# Analysis output
+data/analysis/*.png
+data/analysis/*.jpg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# Python dependencies (keep requirements.txt)
+# requirements.txt - NOT ignored, tracked in repo
+
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
