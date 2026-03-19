@@ -69,6 +69,15 @@ class Config:
     
     # ========== MediaPipe 关键点索引 ==========
     # 参考文档: https://developers.google.com/mediapipe/solutions/vision/pose_landmarker
+    # 上半身
+    LEFT_SHOULDER: int = 11
+    RIGHT_SHOULDER: int = 12
+    LEFT_ELBOW: int = 13
+    RIGHT_ELBOW: int = 14
+    LEFT_WRIST: int = 15
+    RIGHT_WRIST: int = 16
+    
+    # 下半身
     LEFT_HIP: int = 23
     LEFT_KNEE: int = 25
     LEFT_ANKLE: int = 27
@@ -83,6 +92,25 @@ class Config:
         (RIGHT_HIP, RIGHT_KNEE),
         (RIGHT_KNEE, RIGHT_ANKLE),
         (LEFT_HIP, RIGHT_HIP),
+    )
+    
+    # 全身骨骼连接（用于标定和可视化）
+    FULL_BODY_CONNECTIONS: Tuple[Tuple[int, int], ...] = (
+        # 上半身
+        (LEFT_SHOULDER, RIGHT_SHOULDER),
+        (LEFT_SHOULDER, LEFT_ELBOW),
+        (LEFT_ELBOW, LEFT_WRIST),
+        (RIGHT_SHOULDER, RIGHT_ELBOW),
+        (RIGHT_ELBOW, RIGHT_WRIST),
+        # 躯干
+        (LEFT_SHOULDER, LEFT_HIP),
+        (RIGHT_SHOULDER, RIGHT_HIP),
+        (LEFT_HIP, RIGHT_HIP),
+        # 下半身
+        (LEFT_HIP, LEFT_KNEE),
+        (LEFT_KNEE, LEFT_ANKLE),
+        (RIGHT_HIP, RIGHT_KNEE),
+        (RIGHT_KNEE, RIGHT_ANKLE),
     )
 
 
