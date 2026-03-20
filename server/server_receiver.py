@@ -8,16 +8,24 @@
 - 接收客户端上传的训练数据
 - 数据验证和存储
 - 简单的认证机制
+- 数据大屏 API
+- LLM 分析 API
 """
 
 import gzip
 import json
 import sqlite3
+import sys
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from api.dashboard import DashboardAPIHandler
+from api.llm import LLMAPIHandler
 
 
 class FitnessDataReceiver:
@@ -230,24 +238,37 @@ class FitnessDataReceiver:
 
 
 class FitnessHTTPHandler(BaseHTTPRequestHandler):
-    """
-    HTTP请求处理器
+    """HTTP请求处理器"""
     
-    处理客户端的上传请求。
-    """
-    
-    # 数据接收器实例
     receiver = FitnessDataReceiver()
-    
-    # 简单的API密钥（生产环境应使用JWT）
+    dashboard_handler = DashboardAPIHandler()
+    llm_handler = LLMAPIHandler()
     API_KEY = "test-api-key-12345"
     
+    def do_GET(self):
+        """处理 GET 请求"""
+        parsed_path = urlparse(self.path)
+        
+        if parsed_path.path.startswith("/api/v1/dashboard/"):
+            if not self.dashboard_handler.handle_request(self, self.path, "GET"):
+                self._send_error(404, "Dashboard endpoint not found")
+        elif parsed_path.path.startswith("/api/v1/llm/"):
+            if not self.llm_handler.handle_request(self, self.path, "GET"):
+                self._send_error(404, "LLM endpoint not found")
+        else:
+            self._send_error(404, "Endpoint not found")
+    
     def do_POST(self):
-        """处理POST请求"""
+        """处理 POST 请求"""
         parsed_path = urlparse(self.path)
         
         if parsed_path.path == "/api/v1/sessions/upload":
             self._handle_upload()
+        elif parsed_path.path.startswith("/api/v1/llm/"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+            if not self.llm_handler.handle_request(self, self.path, "POST", body):
+                self._send_error(404, "LLM endpoint not found")
         else:
             self._send_error(404, "Endpoint not found")
     
@@ -337,20 +358,27 @@ class FitnessHTTPHandler(BaseHTTPRequestHandler):
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8080):
-    """
-    启动服务器
-    
-    Args:
-        host: 监听地址
-        port: 监听端口
-    """
+    """启动服务器"""
     server = HTTPServer((host, port), FitnessHTTPHandler)
     
     print("=" * 60)
-    print("Fitness Data Server")
+    print("Fitness Data Server v2.0")
     print("=" * 60)
     print(f"监听地址: {host}:{port}")
-    print(f"上传端点: POST http://{host}:{port}/api/v1/sessions/upload")
+    print()
+    print("API 端点:")
+    print(f"  数据上传:    POST  http://{host}:{port}/api/v1/sessions/upload")
+    print(f"  概览统计:    GET   http://{host}:{port}/api/v1/dashboard/overview")
+    print(f"  趋势数据:    GET   http://{host}:{port}/api/v1/dashboard/trend")
+    print(f"  分布数据:    GET   http://{host}:{port}/api/v1/dashboard/distribution")
+    print(f"  热力图:      GET   http://{host}:{port}/api/v1/dashboard/heatmap")
+    print(f"  雷达图:      GET   http://{host}:{port}/api/v1/dashboard/radar")
+    print(f"  最佳记录:    GET   http://{host}:{port}/api/v1/dashboard/best-records")
+    print(f"  最近会话:    GET   http://{host}:{port}/api/v1/dashboard/recent-sessions")
+    print(f"  LLM 分析:    POST  http://{host}:{port}/api/v1/llm/analyze")
+    print(f"  分析状态:    GET   http://{host}:{port}/api/v1/llm/status/{{request_id}}")
+    print(f"  分析类型:    GET   http://{host}:{port}/api/v1/llm/types")
+    print()
     print(f"API密钥: {FitnessHTTPHandler.API_KEY}")
     print("=" * 60)
     print("\n按 Ctrl+C 停止服务器\n")
