@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Data Dashboard - 健身数据大屏</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">FITNESS</span>
+                    <span class="logo-subtitle">Data Dashboard</span>
+                </div>
+            </div>
+            
+            <nav class="nav">
+                <button class="nav-btn active" data-page="overview">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    <span>概览</span>
+                </button>
+                <button class="nav-btn" data-page="trends">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    <span>趋势</span>
+                </button>
+                <button class="nav-btn" data-page="sessions">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <span>训练</span>
+                </button>
+                <button class="nav-btn" data-page="ability">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    <span>能力</span>
+                </button>
+            </nav>
+            
+            <div class="header-right">
+                <div class="time-range-selector" id="timeRangeSelector">
+                    <button class="time-btn active" data-range="today">今日</button>
+                    <button class="time-btn" data-range="week">本周</button>
+                    <button class="time-btn" data-range="month">本月</button>
+                    <button class="time-btn" data-range="all">全部</button>
+                </div>
+                <div class="current-time" id="currentTime">--:--:--</div>
+                <div class="refresh-indicator" id="refreshIndicator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Overview Page -->
+            <section class="page active" id="overviewPage">
+                <div class="page-header">
+                    <h1 class="page-title">概览 Overview</h1>
+                    <div class="page-subtitle">实时训练数据一览</div>
+                </div>
+                
+                <!-- KPI Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 20V10M12 20V4M6 20v-6"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">总训练次数</div>
+                            <div class="kpi-value" id="totalSessions">--</div>
+                            <div class="kpi-trend positive" id="sessionsTrend">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                                    <polyline points="17 6 23 6 23 12"/>
+                                </svg>
+                                <span>--</span>
+                            </div>
+                        </div>
+                        <div class="kpi-glow"></div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22V8M5 12H2a10 10 0 0 0 20 0h-3"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">总深蹲数</div>
+                            <div class="kpi-value" id="totalSquats">--</div>
+                            <div class="kpi-trend positive" id="squatsTrend">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                                    <polyline points="17 6 23 6 23 12"/>
+                                </svg>
+                                <span>--</span>
+                            </div>
+                        </div>
+                        <div class="kpi-glow"></div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">平均质量分</div>
+                            <div class="kpi-value" id="avgQuality">--</div>
+                            <div class="kpi-trend positive" id="qualityTrend">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                                    <polyline points="17 6 23 6 23 12"/>
+                                </svg>
+                                <span>--</span>
+                            </div>
+                        </div>
+                        <div class="kpi-glow"></div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">本周频率</div>
+                            <div class="kpi-value" id="weeklyFreq">--</div>
+                            <div class="kpi-badge" id="weeklyBadge">
+                                <span>--</span>
+                            </div>
+                        </div>
+                        <div class="kpi-glow"></div>
+                    </div>
+                </div>
+                
+                <!-- Charts Row -->
+                <div class="charts-row">
+                    <div class="chart-card large">
+                        <div class="chart-header">
+                            <h3 class="chart-title">近7天训练趋势</h3>
+                            <div class="chart-legend">
+                                <span class="legend-item">
+                                    <span class="legend-dot" style="background: var(--accent-primary)"></span>
+                                    深蹲次数
+                                </span>
+                            </div>
+                        </div>
+                        <div class="chart-container" id="trendChart"></div>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">能力雷达图</h3>
+                        </div>
+                        <div class="chart-container" id="radarChart"></div>
+                    </div>
+                </div>
+                
+                <!-- Recent Sessions Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3 class="table-title">最近训练记录</h3>
+                        <button class="view-all-btn" onclick="switchPage('sessions')">
+                            查看全部
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>深蹲数</th>
+                                    <th>质量分</th>
+                                    <th>时长</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentSessionsBody">
+                                <tr class="loading-row">
+                                    <td colspan="5">
+                                        <div class="loading-spinner"></div>
+                                        <span>加载中...</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trends Page -->
+            <section class="page" id="trendsPage">
+                <div class="page-header">
+                    <h1 class="page-title">趋势 Trends</h1>
+                    <div class="page-subtitle">深入分析训练趋势</div>
+                </div>
+                
+                <div class="trends-content">
+                    <div class="chart-card full-width">
+                        <div class="chart-header">
+                            <h3 class="chart-title">深蹲次数趋势</h3>
+                            <div class="chart-controls">
+                                <button class="chart-btn active" data-metric="squats">次数</button>
+                                <button class="chart-btn" data-metric="duration">时长</button>
+                            </div>
+                        </div>
+                        <div class="chart-container large" id="trendDetailChart"></div>
+                    </div>
+                    
+                    <div class="charts-row">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">训练时段分布</h3>
+                            </div>
+                            <div class="chart-container" id="timeDistChart"></div>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">深度分布</h3>
+                            </div>
+                            <div class="chart-container" id="depthDistChart"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="insight-card">
+                        <div class="insight-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                <line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                            <h3>趋势洞察</h3>
+                        </div>
+                        <div class="insight-content" id="trendInsights">
+                            <p>加载中...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sessions Page -->
+            <section class="page" id="sessionsPage">
+                <div class="page-header">
+                    <h1 class="page-title">训练详情 Sessions</h1>
+                    <div class="page-subtitle">查看单次训练详细数据</div>
+                </div>
+                
+                <div class="sessions-content">
+                    <div class="sessions-list-card">
+                        <div class="list-header">
+                            <h3>训练列表</h3>
+                            <input type="search" class="search-input" placeholder="搜索训练记录...">
+                        </div>
+                        <div class="sessions-list" id="sessionsList">
+                            <div class="loading-placeholder">加载中...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="session-detail-card" id="sessionDetailCard">
+                        <div class="detail-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <p>选择一个训练查看详情</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Ability Page -->
+            <section class="page" id="abilityPage">
+                <div class="page-header">
+                    <h1 class="page-title">能力评估 Ability</h1>
+                    <div class="page-subtitle">多维度训练能力分析</div>
+                </div>
+                
+                <div class="ability-content">
+                    <div class="score-showcase">
+                        <div class="score-ring">
+                            <svg viewBox="0 0 200 200">
+                                <circle cx="100" cy="100" r="90" fill="none" stroke="var(--bg-tertiary)" stroke-width="12"/>
+                                <circle cx="100" cy="100" r="90" fill="none" stroke="url(#scoreGradient)" stroke-width="12" 
+                                        stroke-dasharray="565.48" stroke-dashoffset="565.48" stroke-linecap="round"
+                                        transform="rotate(-90 100 100)" id="scoreCircle"/>
+                                <defs>
+                                    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:var(--accent-primary)"/>
+                                        <stop offset="100%" style="stop-color:var(--accent-secondary)"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div class="score-text">
+                                <span class="score-value" id="overallScore">--</span>
+                                <span class="score-label">综合评分</span>
+                            </div>
+                        </div>
+                        <div class="score-info">
+                            <div class="score-level" id="scoreLevel">--</div>
+                            <div class="score-stars" id="scoreStars">☆☆☆☆☆</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">能力雷达图</h3>
+                        </div>
+                        <div class="chart-container large" id="abilityRadarChart"></div>
+                    </div>
+                    
+                    <div class="dimensions-card">
+                        <h3 class="card-title">维度详情</h3>
+                        <div class="dimensions-list" id="dimensionsList">
+                            <div class="dimension-item">
+                                <div class="dimension-header">
+                                    <span class="dimension-name">深度</span>
+                                    <span class="dimension-score">--/100</span>
+                                </div>
+                                <div class="dimension-bar">
+                                    <div class="dimension-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="dimension-desc">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="goals-card">
+                        <div class="card-header">
+                            <h3 class="card-title">训练目标</h3>
+                            <button class="add-goal-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                设定新目标
+                            </button>
+                        </div>
+                        <div class="goals-list" id="goalsList">
+                            <div class="goal-item">
+                                <div class="goal-header">
+                                    <span class="goal-name">本周目标</span>
+                                    <span class="goal-progress">4/5 次</span>
+                                </div>
+                                <div class="goal-bar">
+                                    <div class="goal-fill" style="width: 80%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
