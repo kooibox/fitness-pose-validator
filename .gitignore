@@ -55,3 +55,6 @@ Thumbs.db
 *.pyc
 *.pyo
 *.pyd
+
+# Export data
+/data/export/

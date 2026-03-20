@@ -11,13 +11,14 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFrame, QHBoxLayout, QHeaderView, QLabel, 
-    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem,
+    QMessageBox, QPushButton, QProgressBar, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget
 )
 from PyQt6.QtGui import QPixmap, QImage
 
 from src.database import Database, Session
 from src.analyzer import TrainingAnalyzer
+from gui.workers.upload_worker import UploadWorker
 
 
 class HistoryPage(QWidget):
@@ -107,6 +108,12 @@ class HistoryPage(QWidget):
         
         layout.addStretch()
         
+        # 上传按钮
+        self._upload_btn = QPushButton("☁️ 上传选中")
+        self._upload_btn.clicked.connect(self._upload_selected)
+        self._upload_btn.setEnabled(False)
+        layout.addWidget(self._upload_btn)
+        
         # 刷新按钮
         refresh_btn = QPushButton("🔄 刷新")
         refresh_btn.clicked.connect(self._load_sessions)
@@ -181,6 +188,7 @@ class HistoryPage(QWidget):
         """选择改变"""
         selected_rows = self._table.selectionModel().selectedRows()
         self._delete_btn.setEnabled(len(selected_rows) > 0)
+        self._upload_btn.setEnabled(len(selected_rows) > 0)
         
         if len(selected_rows) == 1:
             row = selected_rows[0].row()
@@ -372,3 +380,92 @@ class HistoryPage(QWidget):
                 self._clear_detail_panel()
             else:
                 QMessageBox.warning(self, "删除失败", "无法删除记录")
+    
+    def _upload_selected(self):
+        """上传选中的记录"""
+        selected_rows = self._table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        
+        # 获取服务器配置
+        import json
+        config_file = Path(__file__).parent.parent.parent / "data" / "gui_settings.json"
+        if not config_file.exists():
+            QMessageBox.warning(self, "配置错误", "请先在设置页面配置服务器地址")
+            return
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+        except Exception as e:
+            QMessageBox.warning(self, "配置错误", f"无法加载配置: {e}")
+            return
+        
+        server_url = settings.get("server_url", "").strip()
+        api_key = settings.get("api_key", "").strip()
+        
+        if not server_url:
+            QMessageBox.warning(self, "配置错误", "请先在设置页面配置服务器地址")
+            return
+        
+        # 获取要上传的会话ID
+        session_ids = []
+        for index in selected_rows:
+            row = index.row()
+            session_id = int(self._table.item(row, 0).text())
+            session_ids.append(session_id)
+        
+        # 确认上传
+        reply = QMessageBox.question(
+            self,
+            "确认上传",
+            f"确定要上传 {len(session_ids)} 条记录到服务器吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        # 禁用按钮
+        self._upload_btn.setEnabled(False)
+        self._upload_btn.setText("⏳ 上传中...")
+        
+        # 创建上传工作线程
+        self._upload_worker = UploadWorker(
+            session_ids=session_ids,
+            server_url=server_url,
+            api_key=api_key
+        )
+        
+        # 连接信号
+        self._upload_worker.progress.connect(self._on_upload_progress)
+        self._upload_worker.status_update.connect(self._on_upload_status)
+        self._upload_worker.upload_success.connect(self._on_upload_success)
+        self._upload_worker.upload_failed.connect(self._on_upload_failed)
+        self._upload_worker.finished.connect(self._on_upload_finished)
+        
+        # 启动上传
+        self._upload_worker.start()
+    
+    def _on_upload_progress(self, current: int, total: int):
+        """上传进度更新"""
+        self._upload_btn.setText(f"⏳ 上传中... ({current}/{total})")
+    
+    def _on_upload_status(self, status: str):
+        """上传状态更新"""
+        print(f"上传状态: {status}")
+    
+    def _on_upload_success(self, result: dict):
+        """上传成功"""
+        print(f"上传成功: {result}")
+    
+    def _on_upload_failed(self, error: str):
+        """上传失败"""
+        QMessageBox.warning(self, "上传失败", error)
+    
+    def _on_upload_finished(self):
+        """上传完成"""
+        self._upload_btn.setEnabled(True)
+        self._upload_btn.setText("☁️ 上传选中")
+        QMessageBox.information(self, "上传完成", "数据上传任务已完成")

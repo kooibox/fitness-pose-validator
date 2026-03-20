@@ -88,6 +88,10 @@ class SettingsPage(QWidget):
         data_group = self._create_data_group()
         content_layout.addWidget(data_group)
         
+        # 服务器设置
+        server_group = self._create_server_group()
+        content_layout.addWidget(server_group)
+        
         main_layout.addLayout(content_layout)
         main_layout.addStretch()
         
@@ -257,6 +261,80 @@ class SettingsPage(QWidget):
         
         return group
     
+    def _create_server_group(self) -> QGroupBox:
+        """创建服务器设置组"""
+        group = QGroupBox("☁️ 服务器上传设置")
+        layout = QVBoxLayout(group)
+        
+        # 服务器地址
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("服务器地址:"))
+        row1.addStretch()
+        self._server_url = QLineEdit()
+        self._server_url.setPlaceholderText("http://192.168.1.100:8080/api/v1/sessions/upload")
+        self._server_url.setFixedWidth(350)
+        row1.addWidget(self._server_url)
+        layout.addLayout(row1)
+        
+        # API密钥
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("API密钥:"))
+        row2.addStretch()
+        self._api_key = QLineEdit()
+        self._api_key.setPlaceholderText("输入服务器API密钥")
+        self._api_key.setFixedWidth(350)
+        self._api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        row2.addWidget(self._api_key)
+        layout.addLayout(row2)
+        
+        # 自动上传选项
+        row3 = QHBoxLayout()
+        self._auto_upload = QCheckBox("训练结束后自动上传")
+        self._auto_upload.setChecked(False)
+        row3.addWidget(self._auto_upload)
+        layout.addLayout(row3)
+        
+        # 测试连接按钮
+        row4 = QHBoxLayout()
+        row4.addStretch()
+        test_btn = QPushButton("🔗 测试连接")
+        test_btn.clicked.connect(self._test_server_connection)
+        row4.addWidget(test_btn)
+        layout.addLayout(row4)
+        
+        return group
+    
+    def _test_server_connection(self):
+        """测试服务器连接"""
+        from PyQt6.QtWidgets import QMessageBox
+        import urllib.request
+        import urllib.error
+        
+        server_url = self._server_url.text().strip()
+        api_key = self._api_key.text().strip()
+        
+        if not server_url:
+            QMessageBox.warning(self, "测试失败", "请输入服务器地址")
+            return
+        
+        try:
+            # 发送一个简单的HEAD请求测试连接
+            request = urllib.request.Request(
+                server_url,
+                method="HEAD"
+            )
+            
+            if api_key:
+                request.add_header("Authorization", f"Bearer {api_key}")
+            
+            with urllib.request.urlopen(request, timeout=5) as response:
+                QMessageBox.information(self, "连接成功", f"服务器响应: {response.status}")
+                
+        except urllib.error.URLError as e:
+            QMessageBox.warning(self, "连接失败", f"无法连接到服务器:\n{e}")
+        except Exception as e:
+            QMessageBox.warning(self, "连接失败", f"测试连接时出错:\n{e}")
+    
     def _load_settings(self) -> dict:
         """加载设置"""
         if self.CONFIG_FILE.exists():
@@ -303,6 +381,14 @@ class SettingsPage(QWidget):
             self._db_path.setText(self._settings["db_path"])
         if "buffer_size" in self._settings:
             self._buffer_size.setValue(self._settings["buffer_size"])
+        
+        # 服务器设置
+        if "server_url" in self._settings:
+            self._server_url.setText(self._settings["server_url"])
+        if "api_key" in self._settings:
+            self._api_key.setText(self._settings["api_key"])
+        if "auto_upload" in self._settings:
+            self._auto_upload.setChecked(self._settings["auto_upload"])
     
     def _save_settings(self):
         """保存设置"""
@@ -326,6 +412,11 @@ class SettingsPage(QWidget):
             # 数据设置
             "db_path": self._db_path.text(),
             "buffer_size": self._buffer_size.value(),
+            
+            # 服务器设置
+            "server_url": self._server_url.text(),
+            "api_key": self._api_key.text(),
+            "auto_upload": self._auto_upload.isChecked(),
         }
         
         # 确保目录存在
