@@ -102,8 +102,7 @@ class MainWindow(QMainWindow):
     def _on_settings_changed(self, settings: dict):
         """设置改变回调"""
         # 应用设置到训练页面
-        # TODO: 实现设置应用逻辑
-        pass
+        self._training_page.apply_settings(settings)
     
     def closeEvent(self, event):
         """窗口关闭事件"""

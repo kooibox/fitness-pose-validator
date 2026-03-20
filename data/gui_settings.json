@@ -1,0 +1,14 @@
+{
+  "camera_index": 0,
+  "resolution": "1280x720",
+  "fps": 30,
+  "rotate_frame": true,
+  "standing_threshold": 165,
+  "squat_threshold": 90,
+  "detection_confidence": 0.5,
+  "show_skeleton": true,
+  "show_angles": true,
+  "show_chart": true,
+  "db_path": "E:\\code\\fitness-pose-validator\\data\\fitness_data.db",
+  "buffer_size": 100
+}

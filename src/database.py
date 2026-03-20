@@ -215,3 +215,47 @@ class Database:
                 (limit,)
             )
             return [Session(*row) for row in cursor.fetchall()]
+    
+    def delete_session(self, session_id: int) -> bool:
+        """删除训练会话及其所有记录。"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                "DELETE FROM squat_records WHERE session_id = ?",
+                (session_id,)
+            )
+            
+            cursor.execute(
+                "DELETE FROM sessions WHERE id = ?",
+                (session_id,)
+            )
+            
+            conn.commit()
+            
+            return cursor.rowcount > 0
+    
+    def delete_sessions(self, session_ids: List[int]) -> int:
+        """批量删除训练会话及其所有记录。"""
+        if not session_ids:
+            return 0
+        
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            placeholders = ','.join('?' * len(session_ids))
+            
+            cursor.execute(
+                f"DELETE FROM squat_records WHERE session_id IN ({placeholders})",
+                session_ids
+            )
+            
+            cursor.execute(
+                f"DELETE FROM sessions WHERE id IN ({placeholders})",
+                session_ids
+            )
+            
+            deleted_count = cursor.rowcount
+            conn.commit()
+        
+        return deleted_count

@@ -241,7 +241,38 @@ class TrainingPage(QWidget):
             self._reset_detection()
     
     def _on_screenshot_clicked(self):
-        QMessageBox.information(self, "截图", "截图功能开发中...")
+        """截图当前训练画面"""
+        import os
+        from datetime import datetime
+        from pathlib import Path
+        
+        # 获取当前帧
+        current_frame = self._video_widget.current_frame
+        if current_frame is None:
+            QMessageBox.warning(self, "截图失败", "没有可截图的画面")
+            return
+        
+        # 创建截图目录
+        screenshot_dir = Path(__file__).parent.parent.parent / "data" / "screenshots"
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 生成文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"screenshot_{timestamp}.png"
+        filepath = screenshot_dir / filename
+        
+        # 保存截图
+        import cv2
+        success = cv2.imwrite(str(filepath), current_frame)
+        
+        if success:
+            QMessageBox.information(
+                self, 
+                "截图成功", 
+                f"截图已保存到:\n{filepath}"
+            )
+        else:
+            QMessageBox.critical(self, "截图失败", "无法保存截图文件")
     
     def _on_strictness_changed(self, level: StrictnessLevel):
         self._current_strictness = level
@@ -262,6 +293,9 @@ class TrainingPage(QWidget):
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.valid_count_updated.connect(self._on_valid_count_updated)
         self._worker.feedback_updated.connect(self._on_feedback_updated)
+        
+        # 应用待处理的设置
+        self._apply_pending_settings()
         
         self._worker.set_strictness(self._current_strictness)
         self._worker.start()
@@ -342,6 +376,37 @@ class TrainingPage(QWidget):
             elapsed = time.time() - self._start_time
             td = timedelta(seconds=int(elapsed))
             self._time_label.setText(str(td).zfill(8))
+    
+    def apply_settings(self, settings: dict):
+        """应用设置到训练页面"""
+        # 如果训练正在进行中，通知用户设置将在下次训练时生效
+        if self._state != self.State.IDLE:
+            QMessageBox.information(
+                self,
+                "设置已保存",
+                "设置已保存，将在下次开始训练时生效。"
+            )
+            return
+        
+        # 存储设置，将在下次启动检测时应用
+        self._pending_settings = settings
+    
+    def _apply_pending_settings(self):
+        """应用待处理的设置到检测线程"""
+        if not hasattr(self, '_pending_settings') or not self._pending_settings:
+            return
+        
+        settings = self._pending_settings
+        
+        # 应用摄像头设置
+        if self._worker:
+            if "camera_index" in settings:
+                self._worker.set_camera_index(settings["camera_index"])
+            if "rotate_frame" in settings:
+                self._worker.set_rotate_frame(settings["rotate_frame"])
+        
+        # 清除待处理设置
+        self._pending_settings = {}
     
     def closeEvent(self, event):
         if self._state != self.State.IDLE:

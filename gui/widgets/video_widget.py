@@ -40,11 +40,19 @@ class VideoWidget(QLabel):
         """)
         
         self._current_pixmap: QPixmap = None
+        self._current_frame: np.ndarray = None
         self._is_fullscreen = False
+    
+    @property
+    def current_frame(self) -> np.ndarray:
+        """获取当前显示的帧"""
+        return self._current_frame
     
     def update_frame(self, frame: np.ndarray):
         if frame is None:
             return
+        
+        self._current_frame = frame.copy()  # 保存当前帧
         
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_frame.shape

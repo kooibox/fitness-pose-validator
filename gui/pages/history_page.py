@@ -6,6 +6,7 @@
 
 from datetime import datetime
 from typing import List, Optional
+from pathlib import Path
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -13,6 +14,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QPushButton, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget
 )
+from PyQt6.QtGui import QPixmap, QImage
 
 from src.database import Database, Session
 from src.analyzer import TrainingAnalyzer
@@ -263,8 +265,75 @@ class HistoryPage(QWidget):
         
         self._detail_layout.addWidget(angle_frame)
         
+        # 图表显示
+        chart_title = QLabel("训练分析图表")
+        chart_title.setStyleSheet("font-weight: 600; margin-top: 12px;")
+        self._detail_layout.addWidget(chart_title)
+        
+        # 生成图表
+        chart_label = self._generate_chart(session_id)
+        if chart_label:
+            self._detail_layout.addWidget(chart_label)
+        
         # 弹性空间
         self._detail_layout.addStretch()
+    
+    def _generate_chart(self, session_id: int) -> Optional[QLabel]:
+        """生成训练分析图表"""
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            from io import BytesIO
+            
+            # 生成图表
+            fig = self._analyzer.plot_session_analysis(session_id)
+            if not fig:
+                return None
+            
+            # 将图表转换为 QPixmap
+            buf = BytesIO()
+            fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            plt.close(fig)
+            buf.seek(0)
+            
+            # 创建 QImage
+            img_data = buf.read()
+            qimg = QImage.fromData(img_data)
+            pixmap = QPixmap.fromImage(qimg)
+            
+            # 创建 QLabel 显示图表
+            chart_label = QLabel()
+            chart_label.setPixmap(pixmap)
+            chart_label.setScaledContents(True)
+            chart_label.setMaximumHeight(400)
+            chart_label.setStyleSheet("""
+                background-color: white;
+                border-radius: 8px;
+                padding: 8px;
+            """)
+            
+            return chart_label
+            
+        except Exception as e:
+            print(f"生成图表失败: {e}")
+            return None
+    
+    def _clear_detail_panel(self):
+        """清除详情面板内容"""
+        for i in reversed(range(self._detail_layout.count())):
+            item = self._detail_layout.itemAt(i)
+            if item and item.widget():
+                item.widget().deleteLater()
+        
+        # 添加占位内容
+        self._detail_placeholder = QLabel("选择一条记录查看详情")
+        self._detail_placeholder.setStyleSheet("""
+            color: #94A3B8;
+            font-size: 14px;
+        """)
+        self._detail_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._detail_layout.addWidget(self._detail_placeholder)
     
     def _delete_selected(self):
         """删除选中的记录"""
@@ -281,5 +350,25 @@ class HistoryPage(QWidget):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            # TODO: 实现删除功能
-            QMessageBox.information(self, "提示", "删除功能开发中...")
+            # 获取要删除的会话ID
+            session_ids = []
+            for index in selected_rows:
+                row = index.row()
+                session_id = int(self._table.item(row, 0).text())
+                session_ids.append(session_id)
+            
+            # 批量删除
+            deleted_count = self._db.delete_sessions(session_ids)
+            
+            if deleted_count > 0:
+                QMessageBox.information(
+                    self,
+                    "删除成功",
+                    f"已删除 {deleted_count} 条记录"
+                )
+                # 刷新列表
+                self._load_sessions()
+                # 清除详情面板
+                self._clear_detail_panel()
+            else:
+                QMessageBox.warning(self, "删除失败", "无法删除记录")

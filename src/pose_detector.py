@@ -48,7 +48,9 @@ class PoseDetector:
         if not self._model_path.exists():
             raise FileNotFoundError(
                 f"模型文件不存在: {self._model_path}\n"
-                f"请确保模型文件已放置在正确位置。"
+                f"请确保模型文件已放置在正确位置。\n"
+                f"模型文件应位于: {Config.MODEL_PATH}\n"
+                f"可从以下地址下载: https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task"
             )
     
     def _create_landmarker(self) -> vision.PoseLandmarker:

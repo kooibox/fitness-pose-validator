@@ -263,8 +263,8 @@ class SettingsPage(QWidget):
             try:
                 with open(self.CONFIG_FILE, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"加载设置失败: {e}")
         return {}
     
     def _apply_settings_to_ui(self):

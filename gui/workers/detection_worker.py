@@ -49,7 +49,7 @@ def put_chinese_text(
     if font_path:
         try:
             font = ImageFont.truetype(font_path, font_size)
-        except:
+        except Exception as e:
             font = ImageFont.load_default()
     else:
         # 尝试常见的中文字体
@@ -65,7 +65,7 @@ def put_chinese_text(
             try:
                 font = ImageFont.truetype(fn, font_size)
                 break
-            except:
+            except Exception as e:
                 continue
         if font is None:
             font = ImageFont.load_default()
@@ -406,40 +406,33 @@ class DetectionWorker(QThread):
                             cv2.circle(frame, (jx, jy), 16, highlight_color, 1)
         
         # 绘制计数
-        cv2.putText(
+        frame = put_chinese_text(
             frame,
-            f"REPS: {metrics.rep_count}",
+            f"深蹲: {metrics.rep_count}",
             (20, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1.0,
-            (0, 255, 0),
-            2,
+            font_size=32,
+            color=(0, 255, 0)
         )
         
         # 绘制状态
         state_color = (0, 255, 0) if metrics.state.value == "STANDING" else (0, 165, 255)
-        cv2.putText(
+        state_text = "站立" if metrics.state.value == "STANDING" else "下蹲"
+        frame = put_chinese_text(
             frame,
-            f"State: {metrics.state.value}",
-            (20, 80),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            state_color,
-            1,
+            f"状态: {state_text}",
+            (20, 90),
+            font_size=24,
+            color=state_color
         )
         
         # 绘制角度信息
-        cv2.putText(
+        frame = put_chinese_text(
             frame,
-            f"Knee: {metrics.avg_knee_angle:.0f}",
-            (20, 80),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (200, 200, 200),
-            1,
+            f"膝角: {metrics.avg_knee_angle:.0f}°",
+            (20, 130),
+            font_size=20,
+            color=(200, 200, 200)
         )
-        
-        return frame
         
         return frame
     
