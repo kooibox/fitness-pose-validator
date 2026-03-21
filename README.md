@@ -1,6 +1,6 @@
 # 🏋️ Fitness Pose Validator
 
-[![Version](https://img.shields.io/badge/version-v2.2.0-blue.svg)](https://github.com/kooibox/fitness-pose-validator)
+[![Version](https://img.shields.io/badge/version-v2.3.0-blue.svg)](https://github.com/kooibox/fitness-pose-validator)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-yellow.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
@@ -269,6 +269,19 @@ python -m pytest tests/
 5. 创建 Pull Request
 
 ## 📝 更新日志
+
+### v2.3.0 (2026-03-21)
+
+#### 新增
+- 设置页面重构：双栏布局设计，分类导航（摄像头、检测参数、界面、存储、服务器）
+- 历史记录页面重构：下拉栏模式，卡片式信息展示
+- 服务器连接配置：默认服务器地址和 API Key 预配置
+- Docker 部署支持：Dockerfile 和 docker-compose 配置
+
+#### 优化
+- QSS 主题样式增强：QCheckBox、输入控件样式完善
+- 组件样式统一：按钮、卡片风格一致化
+- 代码结构简化：移除冗余嵌套容器
 
 ### v2.2.0 (2026-03-20)
 

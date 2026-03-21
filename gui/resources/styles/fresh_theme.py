@@ -190,20 +190,139 @@ QProgressBar::chunk {
 }
 
 /* ========== 输入框 ========== */
-QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+QLineEdit {
     background-color: #FFFFFF;
     border: 2px solid #E2E8F0;
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 6px;
+    padding: 6px 12px;
     color: #1E293B;
+    min-height: 28px;
 }
 
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
+QLineEdit:focus {
     border-color: #10B981;
 }
 
-QLineEdit:hover, QSpinBox:hover, QDoubleSpinBox:hover, QComboBox:hover {
+QLineEdit:hover {
     border-color: #CBD5E1;
+}
+
+/* ========== 下拉框 ========== */
+QComboBox {
+    background-color: #FFFFFF;
+    border: 2px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 6px 12px;
+    padding-right: 32px;
+    color: #1E293B;
+    min-height: 28px;
+}
+
+QComboBox:focus {
+    border-color: #10B981;
+}
+
+QComboBox:hover {
+    border-color: #CBD5E1;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: 24px;
+    border: none;
+    border-left: 1px solid #E2E8F0;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background-color: #F8FAFC;
+}
+
+QComboBox::drop-down:hover {
+    background-color: #F1F5F9;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    width: 12px;
+    height: 12px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #64748B;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    border: 2px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 4px;
+    selection-background-color: #D1FAE5;
+    selection-color: #047857;
+    outline: none;
+}
+
+/* ========== 数字输入框 ========== */
+QSpinBox, QDoubleSpinBox {
+    background-color: #FFFFFF;
+    border: 2px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 6px 12px;
+    padding-right: 28px;
+    color: #1E293B;
+    min-height: 28px;
+}
+
+QSpinBox:focus, QDoubleSpinBox:focus {
+    border-color: #10B981;
+}
+
+QSpinBox:hover, QDoubleSpinBox:hover {
+    border-color: #CBD5E1;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    height: 12px;
+    border: none;
+    border-left: 1px solid #E2E8F0;
+    border-top-right-radius: 4px;
+    background-color: #F8FAFC;
+}
+
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
+    background-color: #F1F5F9;
+}
+
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: padding;
+    subcontrol-position: bottom right;
+    width: 20px;
+    height: 12px;
+    border: none;
+    border-left: 1px solid #E2E8F0;
+    border-bottom-right-radius: 4px;
+    background-color: #F8FAFC;
+}
+
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: #F1F5F9;
+}
+
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    width: 10px;
+    height: 10px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 5px solid #64748B;
+}
+
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    width: 10px;
+    height: 10px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #64748B;
 }
 
 /* ========== 滑块 ========== */
@@ -294,15 +413,55 @@ QGroupBox {
     font-weight: 600;
     border: 1px solid #E2E8F0;
     border-radius: 8px;
-    margin-top: 12px;
-    padding-top: 24px;
+    margin-top: 16px;
+    padding-top: 20px;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-bottom: 16px;
 }
 
 QGroupBox::title {
     subcontrol-origin: margin;
-    left: 12px;
+    subcontrol-position: top left;
+    left: 16px;
+    top: 2px;
     padding: 0 8px;
     color: #334155;
+}
+
+/* ========== 复选框 ========== */
+QCheckBox {
+    spacing: 8px;
+    color: #1E293B;
+}
+
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #CBD5E1;
+    border-radius: 4px;
+    background-color: #FFFFFF;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #10B981;
+    background-color: #F0FDF4;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #10B981;
+    border-color: #10B981;
+    image: none;
+}
+
+QCheckBox::indicator:checked:hover {
+    background-color: #059669;
+    border-color: #059669;
+}
+
+QCheckBox::indicator:disabled {
+    background-color: #F1F5F9;
+    border-color: #E2E8F0;
 }
 
 /* ========== 消息框 ========== */

@@ -5,13 +5,13 @@
   "rotate_frame": true,
   "standing_threshold": 165,
   "squat_threshold": 90,
-  "detection_confidence": 0.5,
+  "detection_confidence": 0.69,
   "show_skeleton": true,
   "show_angles": true,
   "show_chart": true,
   "db_path": "E:\\code\\fitness-pose-validator\\data\\fitness_data.db",
   "buffer_size": 100,
-  "server_url": "http://172.19.46.244:8080/api/v1/sessions/upload",
+  "server_url": "http://117.72.185.244/api/v1/sessions/upload",
   "api_key": "test-api-key-12345",
   "auto_upload": false
 }

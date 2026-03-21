@@ -1,314 +1,480 @@
 """
 设置页面
 
-应用程序配置界面。
+应用程序配置界面 - 现代化双栏布局设计。
 """
 
 import json
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QFrame, QGroupBox, QHBoxLayout,
+    QCheckBox, QComboBox, QFrame, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QSlider, QSpinBox,
-    QVBoxLayout, QWidget
+    QVBoxLayout, QWidget, QScrollArea, QStackedWidget,
+    QSizePolicy, QSpacerItem
 )
 
 from src.config import Config
 
 
+class SettingRow(QWidget):
+    """单行设置项组件"""
+    
+    def __init__(self, label: str, widget: QWidget, description: str = None, parent=None):
+        super().__init__(parent)
+        self._init_ui(label, widget, description)
+    
+    def _init_ui(self, label: str, widget: QWidget, description: str):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        
+        label_widget = QLabel(label)
+        label_widget.setStyleSheet("color: #334155; font-weight: 500;")
+        row.addWidget(label_widget)
+        
+        row.addStretch()
+        
+        widget.setMinimumHeight(36)
+        row.addWidget(widget)
+        
+        layout.addLayout(row)
+        
+        if description:
+            desc_label = QLabel(description)
+            desc_label.setStyleSheet("color: #94A3B8; font-size: 12px;")
+            layout.addWidget(desc_label)
+
+
+class SliderWithLabel(QWidget):
+    """带数值显示的滑块组件"""
+    
+    def __init__(self, min_val: int, max_val: int, default_val: int, 
+                 suffix: str = "", format_str: str = None, parent=None):
+        super().__init__(parent)
+        self._suffix = suffix
+        self._format_str = format_str
+        self._init_ui(min_val, max_val, default_val)
+    
+    def _init_ui(self, min_val: int, max_val: int, default_val: int):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        
+        self._slider = QSlider(Qt.Orientation.Horizontal)
+        self._slider.setRange(min_val, max_val)
+        self._slider.setValue(default_val)
+        self._slider.setMinimumWidth(180)
+        layout.addWidget(self._slider)
+        
+        self._label = QLabel()
+        self._label.setMinimumWidth(50)
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._update_label(default_val)
+        layout.addWidget(self._label)
+        
+        self._slider.valueChanged.connect(self._update_label)
+    
+    def _update_label(self, value: int):
+        if self._format_str:
+            text = self._format_str.format(value / 100)
+        else:
+            text = f"{value}{self._suffix}"
+        self._label.setText(text)
+    
+    def value(self) -> int:
+        return self._slider.value()
+    
+    def setValue(self, value: int):
+        self._slider.setValue(value)
+    
+    def valueChanged(self, callback):
+        self._slider.valueChanged.connect(callback)
+
+
+class CategoryButton(QPushButton):
+    """侧边栏分类按钮"""
+    
+    def __init__(self, icon: str, text: str, parent=None):
+        super().__init__(parent)
+        self._icon = icon
+        self._text = text
+        self._active = False
+        self._init_ui()
+    
+    def _init_ui(self):
+        self.setText(f"{self._icon}  {self._text}")
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimumHeight(48)
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #475569;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 16px;
+                text-align: left;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #F1F5F9;
+                color: #1E293B;
+            }
+            QPushButton:checked {
+                background-color: #D1FAE5;
+                color: #059669;
+                font-weight: 600;
+            }
+        """)
+    
+    def setActive(self, active: bool):
+        self._active = active
+        self.setChecked(active)
+
+
 class SettingsPage(QWidget):
-    """
-    设置页面
+    """设置页面 - 现代化双栏布局"""
     
-    包含摄像头、检测参数和界面配置。
-    """
-    
-    # 配置改变信号
     settings_changed = pyqtSignal(dict)
-    
-    # 配置文件路径
     CONFIG_FILE = Path(__file__).parent.parent.parent / "data" / "gui_settings.json"
     
     def __init__(self, parent=None):
-        """初始化设置页面"""
         super().__init__(parent)
-        
-        # 加载配置
         self._settings = self._load_settings()
-        
-        # 初始化 UI
+        self._category_buttons = []
         self._init_ui()
-        
-        # 应用配置到 UI
         self._apply_settings_to_ui()
     
     def _init_ui(self):
-        """初始化用户界面"""
-        # 主布局
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(16)
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # 标题
-        header = QFrame()
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar = self._create_sidebar()
+        main_layout.addWidget(sidebar)
         
-        title = QLabel("⚙️ 设置")
-        title.setProperty("cssClass", "title")
-        header_layout.addWidget(title)
-        
-        header_layout.addStretch()
-        
-        # 重置按钮
-        reset_btn = QPushButton("🔄 恢复默认")
-        reset_btn.clicked.connect(self._reset_to_default)
-        header_layout.addWidget(reset_btn)
-        
-        main_layout.addWidget(header)
-        
-        # 滚动区域内容
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(16)
-        
-        # 摄像头设置
-        camera_group = self._create_camera_group()
-        content_layout.addWidget(camera_group)
-        
-        # 检测参数
-        detection_group = self._create_detection_group()
-        content_layout.addWidget(detection_group)
-        
-        # 界面设置
-        ui_group = self._create_ui_group()
-        content_layout.addWidget(ui_group)
-        
-        # 数据设置
-        data_group = self._create_data_group()
-        content_layout.addWidget(data_group)
-        
-        # 服务器设置
-        server_group = self._create_server_group()
-        content_layout.addWidget(server_group)
-        
-        main_layout.addLayout(content_layout)
-        main_layout.addStretch()
-        
-        # 保存按钮
-        save_btn = QPushButton("💾 保存设置")
-        save_btn.setProperty("cssClass", "primary")
-        save_btn.clicked.connect(self._save_settings)
-        main_layout.addWidget(save_btn)
+        content_area = self._create_content_area()
+        main_layout.addWidget(content_area, stretch=1)
     
-    def _create_camera_group(self) -> QGroupBox:
-        """创建摄像头设置组"""
-        group = QGroupBox("摄像头设置")
-        layout = QVBoxLayout(group)
+    def _create_sidebar(self) -> QWidget:
+        sidebar = QFrame()
+        sidebar.setFixedWidth(220)
+        sidebar.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-right: 1px solid #E2E8F0;
+            }
+        """)
         
-        # 摄像头索引
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("摄像头索引:"))
-        row1.addStretch()
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(16, 24, 16, 24)
+        layout.setSpacing(8)
+        
+        title = QLabel("设置")
+        title.setStyleSheet("""
+            font-size: 20px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 8px;
+        """)
+        layout.addWidget(title)
+        
+        layout.addSpacing(16)
+        
+        categories = [
+            ("📷", "摄像头", 0),
+            ("🎯", "检测参数", 1),
+            ("🎨", "界面显示", 2),
+            ("💾", "数据存储", 3),
+            ("☁️", "服务器", 4),
+        ]
+        
+        for icon, text, index in categories:
+            btn = CategoryButton(icon, text)
+            btn.clicked.connect(lambda checked, i=index: self._switch_category(i))
+            self._category_buttons.append(btn)
+            layout.addWidget(btn)
+        
+        self._category_buttons[0].setChecked(True)
+        
+        layout.addStretch()
+        
+        reset_btn = QPushButton("🔄 恢复默认")
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #64748B;
+                border: 1px solid #E2E8F0;
+                border-radius: 8px;
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #FEF2F2;
+                border-color: #FECACA;
+                color: #DC2626;
+            }
+        """)
+        reset_btn.clicked.connect(self._reset_to_default)
+        layout.addWidget(reset_btn)
+        
+        return sidebar
+    
+    def _create_content_area(self) -> QWidget:
+        content = QFrame()
+        content.setStyleSheet("background-color: #F8FAFC;")
+        
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                background-color: transparent;
+                width: 8px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #CBD5E1;
+                border-radius: 4px;
+                min-height: 40px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #94A3B8;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+            }
+        """)
+        
+        self._stack = QStackedWidget()
+        
+        self._stack.addWidget(self._create_camera_page())
+        self._stack.addWidget(self._create_detection_page())
+        self._stack.addWidget(self._create_ui_page())
+        self._stack.addWidget(self._create_data_page())
+        self._stack.addWidget(self._create_server_page())
+        
+        scroll.setWidget(self._stack)
+        layout.addWidget(scroll)
+        
+        save_bar = self._create_save_bar()
+        layout.addWidget(save_bar)
+        
+        return content
+    
+    def _create_camera_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(12)
+        
         self._camera_index = QSpinBox()
         self._camera_index.setRange(0, 10)
         self._camera_index.setValue(Config.CAMERA_INDEX)
-        row1.addWidget(self._camera_index)
-        layout.addLayout(row1)
+        self._camera_index.setFixedWidth(80)
+        row1 = SettingRow("摄像头索引", self._camera_index, "选择要使用的摄像头设备")
+        layout.addWidget(row1)
         
-        # 分辨率
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("分辨率:"))
-        row2.addStretch()
         self._resolution = QComboBox()
-        self._resolution.addItems([
-            "640x480",
-            "1280x720",
-            "1920x1080",
-        ])
+        self._resolution.addItems(["640x480", "1280x720", "1920x1080"])
         self._resolution.setCurrentText(f"{Config.CAMERA_RESOLUTION[0]}x{Config.CAMERA_RESOLUTION[1]}")
-        row2.addWidget(self._resolution)
-        layout.addLayout(row2)
+        self._resolution.setFixedWidth(120)
+        row2 = SettingRow("分辨率", self._resolution, "摄像头采集分辨率")
+        layout.addWidget(row2)
         
-        # 帧率
-        row3 = QHBoxLayout()
-        row3.addWidget(QLabel("目标帧率:"))
-        row3.addStretch()
         self._fps = QSpinBox()
         self._fps.setRange(15, 60)
         self._fps.setValue(Config.CAMERA_FPS)
-        row3.addWidget(self._fps)
-        layout.addLayout(row3)
+        self._fps.setFixedWidth(80)
+        row3 = SettingRow("目标帧率", self._fps, "每秒采集帧数")
+        layout.addWidget(row3)
         
-        # 旋转帧
-        row4 = QHBoxLayout()
-        self._rotate_frame = QCheckBox("旋转帧 90° (竖屏摄像头)")
+        rotate_container = QWidget()
+        rotate_layout = QHBoxLayout(rotate_container)
+        rotate_layout.setContentsMargins(0, 0, 0, 0)
+        self._rotate_frame = QCheckBox("启用")
         self._rotate_frame.setChecked(True)
-        row4.addWidget(self._rotate_frame)
-        layout.addLayout(row4)
+        rotate_layout.addWidget(self._rotate_frame)
+        row4 = SettingRow("旋转画面", rotate_container, "适用于竖屏摄像头")
+        layout.addWidget(row4)
         
-        return group
+        layout.addStretch()
+        
+        return page
     
-    def _create_detection_group(self) -> QGroupBox:
-        """创建检测参数组"""
-        group = QGroupBox("检测参数")
-        layout = QVBoxLayout(group)
+    def _create_detection_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(12)
         
-        # 站立阈值
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("站立阈值:"))
-        row1.addStretch()
-        self._standing_threshold = QSlider(Qt.Orientation.Horizontal)
-        self._standing_threshold.setRange(120, 180)
-        self._standing_threshold.setValue(int(Config.STANDING_ANGLE_THRESHOLD))
-        self._standing_threshold.setFixedWidth(200)
-        row1.addWidget(self._standing_threshold)
-        self._standing_threshold_label = QLabel(f"{int(Config.STANDING_ANGLE_THRESHOLD)}°")
-        self._standing_threshold_label.setFixedWidth(40)
-        row1.addWidget(self._standing_threshold_label)
-        self._standing_threshold.valueChanged.connect(
-            lambda v: self._standing_threshold_label.setText(f"{v}°")
-        )
-        layout.addLayout(row1)
+        self._standing_threshold = SliderWithLabel(120, 180, int(Config.STANDING_ANGLE_THRESHOLD), "°")
+        row1 = SettingRow("站立阈值", self._standing_threshold, "膝关节角度大于此值判定为站立")
+        layout.addWidget(row1)
         
-        # 下蹲阈值
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("下蹲阈值:"))
-        row2.addStretch()
-        self._squat_threshold = QSlider(Qt.Orientation.Horizontal)
-        self._squat_threshold.setRange(45, 120)
-        self._squat_threshold.setValue(int(Config.SQUAT_ANGLE_THRESHOLD))
-        self._squat_threshold.setFixedWidth(200)
-        row2.addWidget(self._squat_threshold)
-        self._squat_threshold_label = QLabel(f"{int(Config.SQUAT_ANGLE_THRESHOLD)}°")
-        self._squat_threshold_label.setFixedWidth(40)
-        row2.addWidget(self._squat_threshold_label)
-        self._squat_threshold.valueChanged.connect(
-            lambda v: self._squat_threshold_label.setText(f"{v}°")
-        )
-        layout.addLayout(row2)
+        self._squat_threshold = SliderWithLabel(45, 120, int(Config.SQUAT_ANGLE_THRESHOLD), "°")
+        row2 = SettingRow("下蹲阈值", self._squat_threshold, "膝关节角度小于此值判定为下蹲")
+        layout.addWidget(row2)
         
-        # 检测置信度
-        row3 = QHBoxLayout()
-        row3.addWidget(QLabel("检测置信度:"))
-        row3.addStretch()
-        self._detection_confidence = QSlider(Qt.Orientation.Horizontal)
-        self._detection_confidence.setRange(10, 100)
-        self._detection_confidence.setValue(int(Config.POSE_DETECTION_CONFIDENCE * 100))
-        self._detection_confidence.setFixedWidth(200)
-        row3.addWidget(self._detection_confidence)
-        self._detection_confidence_label = QLabel(f"{Config.POSE_DETECTION_CONFIDENCE:.1f}")
-        self._detection_confidence_label.setFixedWidth(40)
-        row3.addWidget(self._detection_confidence_label)
-        self._detection_confidence.valueChanged.connect(
-            lambda v: self._detection_confidence_label.setText(f"{v/100:.1f}")
-        )
-        layout.addLayout(row3)
+        self._detection_confidence = SliderWithLabel(10, 100, int(Config.POSE_DETECTION_CONFIDENCE * 100), 
+                                                      format_str="{:.2f}")
+        row3 = SettingRow("检测置信度", self._detection_confidence, "姿态检测的最小置信度阈值")
+        layout.addWidget(row3)
         
-        return group
+        layout.addStretch()
+        
+        return page
     
-    def _create_ui_group(self) -> QGroupBox:
-        """创建界面设置组"""
-        group = QGroupBox("界面设置")
-        layout = QVBoxLayout(group)
+    def _create_ui_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(12)
         
-        # 显示骨骼
-        row1 = QHBoxLayout()
         self._show_skeleton = QCheckBox("显示骨骼连线")
         self._show_skeleton.setChecked(True)
-        row1.addWidget(self._show_skeleton)
-        layout.addLayout(row1)
+        layout.addWidget(self._show_skeleton)
         
-        # 显示角度
-        row2 = QHBoxLayout()
         self._show_angles = QCheckBox("显示角度数值")
         self._show_angles.setChecked(True)
-        row2.addWidget(self._show_angles)
-        layout.addLayout(row2)
+        layout.addWidget(self._show_angles)
         
-        # 显示图表
-        row3 = QHBoxLayout()
         self._show_chart = QCheckBox("显示角度曲线图")
         self._show_chart.setChecked(True)
-        row3.addWidget(self._show_chart)
-        layout.addLayout(row3)
+        layout.addWidget(self._show_chart)
         
-        return group
+        layout.addStretch()
+        
+        return page
     
-    def _create_data_group(self) -> QGroupBox:
-        """创建数据设置组"""
-        group = QGroupBox("数据设置")
-        layout = QVBoxLayout(group)
+    def _create_data_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(12)
         
-        # 数据库路径
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("数据库路径:"))
-        row1.addStretch()
         self._db_path = QLineEdit(str(Config.DATABASE_PATH))
-        self._db_path.setFixedWidth(300)
-        row1.addWidget(self._db_path)
-        layout.addLayout(row1)
+        self._db_path.setFixedWidth(280)
+        row1 = SettingRow("数据库路径", self._db_path, "训练数据的存储位置")
+        layout.addWidget(row1)
         
-        # 缓冲区大小
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("缓冲区大小:"))
-        row2.addStretch()
         self._buffer_size = QSpinBox()
         self._buffer_size.setRange(10, 1000)
         self._buffer_size.setValue(Config.RECORD_BUFFER_SIZE)
-        row2.addWidget(self._buffer_size)
-        layout.addLayout(row2)
+        self._buffer_size.setFixedWidth(100)
+        row2 = SettingRow("缓冲区大小", self._buffer_size, "数据写入前的内存缓冲条目数")
+        layout.addWidget(row2)
         
-        return group
+        layout.addStretch()
+        
+        return page
     
-    def _create_server_group(self) -> QGroupBox:
-        """创建服务器设置组"""
-        group = QGroupBox("☁️ 服务器上传设置")
-        layout = QVBoxLayout(group)
+    def _create_server_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(12)
         
-        # 服务器地址
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("服务器地址:"))
-        row1.addStretch()
         self._server_url = QLineEdit()
-        self._server_url.setPlaceholderText("http://192.168.1.100:8080/api/v1/sessions/upload")
-        self._server_url.setFixedWidth(350)
-        row1.addWidget(self._server_url)
-        layout.addLayout(row1)
+        self._server_url.setPlaceholderText("http://117.72.185.244:8080/api/v1/sessions/upload")
+        self._server_url.setFixedWidth(280)
+        row1 = SettingRow("服务器地址", self._server_url, "数据上传的目标服务器URL")
+        layout.addWidget(row1)
         
-        # API密钥
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("API密钥:"))
-        row2.addStretch()
         self._api_key = QLineEdit()
-        self._api_key.setPlaceholderText("输入服务器API密钥")
-        self._api_key.setFixedWidth(350)
+        self._api_key.setPlaceholderText("test-api-key-12345")
         self._api_key.setEchoMode(QLineEdit.EchoMode.Password)
-        row2.addWidget(self._api_key)
-        layout.addLayout(row2)
+        self._api_key.setFixedWidth(280)
+        row2 = SettingRow("API密钥", self._api_key, "用于身份验证的访问密钥")
+        layout.addWidget(row2)
         
-        # 自动上传选项
-        row3 = QHBoxLayout()
-        self._auto_upload = QCheckBox("训练结束后自动上传")
+        self._auto_upload = QCheckBox("训练结束后自动上传数据")
         self._auto_upload.setChecked(False)
-        row3.addWidget(self._auto_upload)
-        layout.addLayout(row3)
+        layout.addWidget(self._auto_upload)
         
-        # 测试连接按钮
-        row4 = QHBoxLayout()
-        row4.addStretch()
-        test_btn = QPushButton("🔗 测试连接")
-        test_btn.clicked.connect(self._test_server_connection)
-        row4.addWidget(test_btn)
-        layout.addLayout(row4)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self._test_btn = QPushButton("测试连接")
+        self._test_btn.setMinimumHeight(36)
+        self._test_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3B82F6;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #2563EB;
+            }
+        """)
+        self._test_btn.clicked.connect(self._test_server_connection)
+        btn_row.addWidget(self._test_btn)
+        layout.addLayout(btn_row)
         
-        return group
+        layout.addStretch()
+        
+        return page
+    
+    def _create_save_bar(self) -> QWidget:
+        bar = QFrame()
+        bar.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-top: 1px solid #E2E8F0;
+            }
+        """)
+        bar.setFixedHeight(72)
+        
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(32, 16, 32, 16)
+        
+        layout.addStretch()
+        
+        save_btn = QPushButton("保存设置")
+        save_btn.setMinimumSize(140, 44)
+        save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 15px;
+            }
+            QPushButton:hover {
+                background-color: #059669;
+            }
+        """)
+        save_btn.clicked.connect(self._save_settings)
+        layout.addWidget(save_btn)
+        
+        return bar
+    
+    def _switch_category(self, index: int):
+        for i, btn in enumerate(self._category_buttons):
+            btn.setChecked(i == index)
+        self._stack.setCurrentIndex(index)
     
     def _test_server_connection(self):
-        """测试服务器连接"""
         from PyQt6.QtWidgets import QMessageBox
         import urllib.request
         import urllib.error
+        from urllib.parse import urlparse
         
         server_url = self._server_url.text().strip()
         api_key = self._api_key.text().strip()
@@ -318,16 +484,15 @@ class SettingsPage(QWidget):
             return
         
         try:
-            # 发送一个简单的HEAD请求测试连接
-            request = urllib.request.Request(
-                server_url,
-                method="HEAD"
-            )
+            parsed = urlparse(server_url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+            test_url = f"{base_url}/api/v1/dashboard/overview"
             
+            request = urllib.request.Request(test_url, method="GET")
             if api_key:
                 request.add_header("Authorization", f"Bearer {api_key}")
             
-            with urllib.request.urlopen(request, timeout=5) as response:
+            with urllib.request.urlopen(request, timeout=10) as response:
                 QMessageBox.information(self, "连接成功", f"服务器响应: {response.status}")
                 
         except urllib.error.URLError as e:
@@ -336,7 +501,6 @@ class SettingsPage(QWidget):
             QMessageBox.warning(self, "连接失败", f"测试连接时出错:\n{e}")
     
     def _load_settings(self) -> dict:
-        """加载设置"""
         if self.CONFIG_FILE.exists():
             try:
                 with open(self.CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -346,11 +510,9 @@ class SettingsPage(QWidget):
         return {}
     
     def _apply_settings_to_ui(self):
-        """将设置应用到 UI"""
         if not self._settings:
             return
         
-        # 摄像头设置
         if "camera_index" in self._settings:
             self._camera_index.setValue(self._settings["camera_index"])
         if "resolution" in self._settings:
@@ -360,7 +522,6 @@ class SettingsPage(QWidget):
         if "rotate_frame" in self._settings:
             self._rotate_frame.setChecked(self._settings["rotate_frame"])
         
-        # 检测参数
         if "standing_threshold" in self._settings:
             self._standing_threshold.setValue(self._settings["standing_threshold"])
         if "squat_threshold" in self._settings:
@@ -368,7 +529,6 @@ class SettingsPage(QWidget):
         if "detection_confidence" in self._settings:
             self._detection_confidence.setValue(int(self._settings["detection_confidence"] * 100))
         
-        # 界面设置
         if "show_skeleton" in self._settings:
             self._show_skeleton.setChecked(self._settings["show_skeleton"])
         if "show_angles" in self._settings:
@@ -376,13 +536,11 @@ class SettingsPage(QWidget):
         if "show_chart" in self._settings:
             self._show_chart.setChecked(self._settings["show_chart"])
         
-        # 数据设置
         if "db_path" in self._settings:
             self._db_path.setText(self._settings["db_path"])
         if "buffer_size" in self._settings:
             self._buffer_size.setValue(self._settings["buffer_size"])
         
-        # 服务器设置
         if "server_url" in self._settings:
             self._server_url.setText(self._settings["server_url"])
         if "api_key" in self._settings:
@@ -391,38 +549,30 @@ class SettingsPage(QWidget):
             self._auto_upload.setChecked(self._settings["auto_upload"])
     
     def _save_settings(self):
-        """保存设置"""
         settings = {
-            # 摄像头
             "camera_index": self._camera_index.value(),
             "resolution": self._resolution.currentText(),
             "fps": self._fps.value(),
             "rotate_frame": self._rotate_frame.isChecked(),
             
-            # 检测参数
             "standing_threshold": self._standing_threshold.value(),
             "squat_threshold": self._squat_threshold.value(),
             "detection_confidence": self._detection_confidence.value() / 100,
             
-            # 界面设置
             "show_skeleton": self._show_skeleton.isChecked(),
             "show_angles": self._show_angles.isChecked(),
             "show_chart": self._show_chart.isChecked(),
             
-            # 数据设置
             "db_path": self._db_path.text(),
             "buffer_size": self._buffer_size.value(),
             
-            # 服务器设置
             "server_url": self._server_url.text(),
             "api_key": self._api_key.text(),
             "auto_upload": self._auto_upload.isChecked(),
         }
         
-        # 确保目录存在
         self.CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         
-        # 保存到文件
         with open(self.CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
         
@@ -433,7 +583,6 @@ class SettingsPage(QWidget):
         QMessageBox.information(self, "保存成功", "设置已保存！")
     
     def _reset_to_default(self):
-        """恢复默认设置"""
         from PyQt6.QtWidgets import QMessageBox
         reply = QMessageBox.question(
             self,
@@ -444,26 +593,21 @@ class SettingsPage(QWidget):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            # 摄像头
             self._camera_index.setValue(Config.CAMERA_INDEX)
             self._resolution.setCurrentText(f"{Config.CAMERA_RESOLUTION[0]}x{Config.CAMERA_RESOLUTION[1]}")
             self._fps.setValue(Config.CAMERA_FPS)
             self._rotate_frame.setChecked(True)
             
-            # 检测参数
             self._standing_threshold.setValue(int(Config.STANDING_ANGLE_THRESHOLD))
             self._squat_threshold.setValue(int(Config.SQUAT_ANGLE_THRESHOLD))
             self._detection_confidence.setValue(int(Config.POSE_DETECTION_CONFIDENCE * 100))
             
-            # 界面设置
             self._show_skeleton.setChecked(True)
             self._show_angles.setChecked(True)
             self._show_chart.setChecked(True)
             
-            # 数据设置
             self._db_path.setText(str(Config.DATABASE_PATH))
             self._buffer_size.setValue(Config.RECORD_BUFFER_SIZE)
     
     def get_settings(self) -> dict:
-        """获取当前设置"""
         return self._settings
