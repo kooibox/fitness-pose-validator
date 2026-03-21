@@ -15,6 +15,17 @@ build/
 .coverage
 htmlcov/
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+fitness_data.db
+data/fitness_data.db
+
+# Logs
+*.log
+logs/
+
 # IDE
 .vscode/
 .idea/
@@ -23,14 +34,7 @@ htmlcov/
 *.swo
 *~
 
-# Database (runtime data - not tracked)
-fitness_data.db
-data/fitness_data.db
-*.sqlite
-*.sqlite3
-
-# MediaPipe models (keep project model, ignore others)
-# models/pose_landmarker.task - tracked
+# MediaPipe models
 *.task
 !models/*.task
 
@@ -42,19 +46,17 @@ data/analysis/*.jpg
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-
 # Environment variables
 .env
+.env.local
 
-# Python dependencies (keep requirements.txt)
-# requirements.txt - NOT ignored, tracked in repo
+# Docker volumes
+docker-data/
 
-# Compiled Python files
-*.pyc
-*.pyo
-*.pyd
+# Temporary files
+*.tmp
+*.bak
+*.cache
 
 # Export data
 /data/export/
