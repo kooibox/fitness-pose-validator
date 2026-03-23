@@ -13,7 +13,11 @@
 | 直接 push 到 main | ❌ 禁止 |
 | force push 到 main | ❌ 禁止 |
 | 删除 main 分支 | ❌ 禁止 |
-| 绕过 PR 审批 | ❌ 禁止（管理员也不例外） |
+
+**单人仓库配置**：
+- ✅ 无需审核批准（`required_approving_review_count: 0`）
+- ✅ 管理员可直接合并 PR（`enforce_admins: false`）
+- ✅ 保持线性历史（`required_linear_history: true`）
 
 **必须通过 Pull Request 流程才能合并到 main。**
 
@@ -38,9 +42,9 @@
 │  git push origin server/功能名称                                 │
 │  gh pr create --title "type(server): 描述" --body "..."          │
 ├──────────────────────────────────────────────────────────────────┤
-│  Step 4: 审核通过后合并                                           │
+│  Step 4: 合并 PR                                                 │
 │  ─────────────────────                                           │
-│  gh pr merge --squash --delete-branch                            │
+│  gh pr merge --squash --delete-branch --admin                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -131,7 +135,7 @@ git checkout -b server/feature-name
 git add . && git commit -m "feat(server): 功能描述"
 git push origin server/feature-name
 gh pr create --title "feat(server): 功能描述" --body "## 变更内容\n- xxx"
-gh pr merge --squash --delete-branch
+gh pr merge --squash --delete-branch --admin
 ```
 
 ### Bug 修复
@@ -141,7 +145,7 @@ git checkout -b fix/bug-name
 git add . && git commit -m "fix(server): 修复描述"
 git push origin fix/bug-name
 gh pr create --title "fix(server): 修复描述" --body "## 问题\n- xxx\n\n## 修复\n- xxx"
-gh pr merge --squash --delete-branch
+gh pr merge --squash --delete-branch --admin
 ```
 
 ### 查看当前状态
@@ -195,5 +199,5 @@ git push origin feature-branch
 
 ---
 
-**最后更新**: 2024-03-23
+**最后更新**: 2026-03-23
 **维护者**: kooibox
