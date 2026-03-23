@@ -31,9 +31,14 @@ class LLMAPIHandler:
     - GET /api/v1/llm/types - 获取支持的分析类型
     """
     
-    def __init__(self):
-        """初始化处理器"""
-        self.analyzer = LLMAnalyzerStub()
+    def __init__(self, analyzer=None):
+        """
+        初始化处理器
+        
+        Args:
+            analyzer: LLM 分析器实例，默认使用桩实现
+        """
+        self.analyzer = analyzer or LLMAnalyzerStub()
     
     def handle_request(
         self,

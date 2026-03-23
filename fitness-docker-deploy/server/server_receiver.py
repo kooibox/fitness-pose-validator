@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from api.dashboard import DashboardAPIHandler
 from api.llm import LLMAPIHandler
+from analysis.llm_analyzer_real import LLMAnalyzerReal
 
 
 class FitnessDataReceiver:
@@ -243,7 +244,19 @@ class FitnessHTTPHandler(BaseHTTPRequestHandler):
     
     receiver = FitnessDataReceiver()
     dashboard_handler = DashboardAPIHandler()
-    llm_handler = LLMAPIHandler()
+    
+    # 使用真实的 LLM 分析器（如果配置了 API 密钥）
+    try:
+        import os
+        response_mode = os.environ.get("LLM_RESPONSE_MODE", "json")
+        llm_handler = LLMAPIHandler(
+            analyzer=LLMAnalyzerReal(response_mode=response_mode)
+        )
+    except (ValueError, ImportError) as e:
+        print(f"警告: 无法初始化真实 LLM 分析器: {e}")
+        print("将使用模拟分析器")
+        llm_handler = LLMAPIHandler()
+    
     API_KEY = "test-api-key-12345"
     
     def do_GET(self):

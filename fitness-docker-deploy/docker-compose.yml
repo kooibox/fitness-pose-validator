@@ -11,6 +11,9 @@ services:
     environment:
       - SERVER_DB_PATH=/data/server_data.db
       - PYTHONUNBUFFERED=1
+      # LLM 配置 - 硅基流动
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - LLM_RESPONSE_MODE=${LLM_RESPONSE_MODE:-json}
     volumes:
       - server-data:/data
     ports:
