@@ -1,10 +1,11 @@
-# 服务器端依赖
-# 核心功能使用 Python 标准库，无需额外依赖
+# FastAPI 核心
+fastapi>=0.100.0
+uvicorn>=0.23.0
 
-# LLM 分析功能依赖
-openai>=1.0.0          # 魔搭平台 API 调用
+# JWT 认证
+python-jose[cryptography]>=3.3.0
+passlib>=1.7.4
+bcrypt>=4.0.0,<5.0.0
 
-# 可选依赖（用于增强功能）
-# flask>=2.0.0          # 如果需要更强大的 Web 框架
-# fastapi>=0.68.0       # 如果需要异步 API 支持
-# uvicorn>=0.15.0       # FastAPI 的 ASGI 服务器
+# LLM 分析
+openai>=1.0.0
