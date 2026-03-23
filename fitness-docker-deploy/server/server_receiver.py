@@ -17,7 +17,7 @@ import json
 import sqlite3
 import sys
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
@@ -360,7 +360,7 @@ class FitnessHTTPHandler(BaseHTTPRequestHandler):
 
 def run_server(host: str = "0.0.0.0", port: int = 8080):
     """启动服务器"""
-    server = HTTPServer((host, port), FitnessHTTPHandler)
+    server = ThreadingHTTPServer((host, port), FitnessHTTPHandler)
     
     print("=" * 60)
     print("Fitness Data Server v2.0")
