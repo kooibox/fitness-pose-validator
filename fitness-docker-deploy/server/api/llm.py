@@ -102,13 +102,8 @@ class LLMAPIHandler:
             # 创建请求对象
             request = LLMAnalysisRequest.from_dict(data)
             
-            # 执行分析（同步方式，因为 stub 是同步的）
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                response = loop.run_until_complete(self.analyzer.analyze(request))
-            finally:
-                loop.close()
+            # 执行分析（使用 asyncio.run 替代手动创建事件循环，避免线程阻塞）
+            response = asyncio.run(self.analyzer.analyze(request))
             
             self._send_json_response(handler, 200, {
                 "status": "success",
