@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # 数据服务器 API
   server:
     build:
       context: .
@@ -11,9 +10,9 @@ services:
     environment:
       - SERVER_DB_PATH=/data/server_data.db
       - PYTHONUNBUFFERED=1
-      # LLM 配置 - 硅基流动
       - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
       - LLM_RESPONSE_MODE=${LLM_RESPONSE_MODE:-json}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-change-in-production}
     volumes:
       - server-data:/data
     ports:
@@ -21,13 +20,12 @@ services:
     networks:
       - fitness-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/dashboard/overview')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
 
-  # Dashboard 静态文件服务
   dashboard:
     image: nginx:alpine
     container_name: fitness-dashboard
@@ -47,18 +45,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # 可选：数据库管理界面（开发环境）
-  # adminer:
-  #   image: adminer:latest
-  #   container_name: fitness-adminer
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8082:8080"
-  #   networks:
-  #     - fitness-network
-  #   depends_on:
-  #     - server
 
 volumes:
   server-data:
