@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 窗口大小改变时重绘图表
     window.addEventListener('resize', debounce(resizeCharts, 250));
+    
+    // 移动端触摸优化
+    initMobileTouch();
 });
 
 // ============ 导航 ============
@@ -774,6 +777,57 @@ function resizeCharts() {
 function showRefreshIndicator(show) {
     const indicator = document.getElementById('refreshIndicator');
     indicator.classList.toggle('spinning', show);
+}
+
+// ============ 移动端触摸优化 ============
+function initMobileTouch() {
+    // 检测是否为触摸设备
+    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+    
+    if (isTouchDevice) {
+        document.body.classList.add('touch-device');
+        
+        // 优化触摸反馈
+        const touchElements = document.querySelectorAll('.nav-btn, .kpi-card, .session-card, .time-btn');
+        touchElements.forEach(el => {
+            el.addEventListener('touchstart', function() {
+                this.style.transform = 'scale(0.98)';
+            }, { passive: true });
+            
+            el.addEventListener('touchend', function() {
+                this.style.transform = '';
+            }, { passive: true });
+        });
+        
+        // 防止双击缩放
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+        
+        // 优化图表触摸体验
+        Object.values(state.charts).forEach(chart => {
+            if (chart && chart.setOption) {
+                chart.setOption({
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'line'
+                        }
+                    }
+                });
+            }
+        });
+    }
+    
+    // 监听屏幕方向变化
+    window.addEventListener('orientationchange', () => {
+        setTimeout(resizeCharts, 300);
+    });
 }
 
 // 导出全局函数
