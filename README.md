@@ -1,6 +1,6 @@
 # 🏋️ Fitness Pose Validator
 
-[![Version](https://img.shields.io/badge/version-v2.3.0-blue.svg)](https://github.com/kooibox/fitness-pose-validator)
+[![Version](https://img.shields.io/badge/version-v2.4.0-blue.svg)](https://github.com/kooibox/fitness-pose-validator)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-yellow.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
@@ -73,9 +73,20 @@ cd dashboard && python -m http.server 8080
 ### 启动数据服务器
 
 ```bash
-cd server
-python run_server.py --port 8081
+cd fitness-docker-deploy/server
+# 开发模式
+uvicorn main:app --reload --host 0.0.0.0 --port 8081
+
+# 或使用 Docker Compose
+cd fitness-docker-deploy
+docker-compose up -d
 ```
+
+### API 文档
+
+服务启动后访问：
+- Swagger UI: http://localhost:8081/docs
+- ReDoc: http://localhost:8081/redoc
 
 ## 📁 项目结构
 
@@ -108,17 +119,22 @@ fitness-pose-validator/
 │   └── workers/               # 后台线程
 │       └── detection_worker.py
 │
-├── server/                    # 数据服务器
-│   ├── server_receiver.py     # HTTP 接收服务
-│   ├── run_server.py          # 启动脚本
-│   ├── analysis/              # 数据分析模块
-│   │   ├── dashboard_analyzer.py  # 大屏分析器
-│   │   └── llm_analyzer.py    # LLM 分析接口
-│   └── api/                   # REST API
-│       ├── dashboard.py       # 大屏数据 API
-│       └── llm.py             # LLM 分析 API
+├── fitness-docker-deploy/     # Docker 部署
+│   ├── server/                # FastAPI 服务器
+│   │   ├── main.py            # FastAPI 入口
+│   │   ├── auth.py            # JWT 认证模块
+│   │   ├── database.py        # 数据库初始化
+│   │   ├── models.py          # Pydantic 模型
+│   │   ├── routers/           # API 路由
+│   │   │   ├── auth.py        # 认证接口
+│   │   │   ├── sessions.py    # 训练数据接口
+│   │   │   ├── dashboard.py   # 大屏数据接口
+│   │   │   └── llm.py         # LLM 分析接口
+│   │   └── analysis/          # 数据分析模块
+│   ├── dashboard/             # Web 前端
+│   └── docker-compose.yml     # Docker 编排
 │
-├── dashboard/                 # Web 数据大屏
+├── dashboard/                 # Web 数据大屏（独立版）
 │   ├── index.html             # 主页面
 │   ├── css/
 │   │   └── styles.css         # 深色主题样式
@@ -141,6 +157,7 @@ fitness-pose-validator/
 | **MediaPipe** | 0.10+ | 人体姿态检测与关键点追踪 |
 | **OpenCV** | 4.x | 图像处理与视频捕获 |
 | **PyQt6** | 6.x | 桌面 GUI 框架 |
+| **FastAPI** | 0.100+ | 高性能 Web 框架 |
 | **SQLite** | 3.x | 本地数据存储 |
 | **Matplotlib** | 3.x | 数据可视化 |
 
@@ -178,6 +195,21 @@ fitness-pose-validator/
 
 ## 📡 API 文档
 
+### 认证 API
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/v1/auth/login` | POST | 用户登录，获取 JWT Token |
+| `/api/v1/auth/me` | GET | 获取当前用户信息（需认证） |
+
+### 训练数据 API
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/v1/sessions/upload` | POST | 上传训练数据（需认证） |
+| `/api/v1/sessions/` | GET | 获取训练会话列表 |
+| `/api/v1/sessions/{id}` | GET | 获取单个会话详情 |
+
 ### Dashboard API
 
 | 端点 | 方法 | 描述 |
@@ -201,11 +233,19 @@ fitness-pose-validator/
 ### 请求示例
 
 ```bash
+# 用户登录
+curl -X POST http://localhost:8081/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "test", "password": "test123"}'
+
+# 上传训练数据（需 Token）
+curl -X POST http://localhost:8081/api/v1/sessions/upload \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"version": "2.4.0", "session": {...}, "records": [...]}'
+
 # 获取概览统计
 curl http://localhost:8081/api/v1/dashboard/overview
-
-# 获取趋势数据
-curl "http://localhost:8081/api/v1/dashboard/trend?metric=squats&period=30d"
 
 # LLM 分析
 curl -X POST http://localhost:8081/api/v1/llm/analyze \
@@ -269,6 +309,30 @@ python -m pytest tests/
 5. 创建 Pull Request
 
 ## 📝 更新日志
+
+### v2.4.0 (2026-03-23)
+
+#### 🚀 重大更新：服务器端 FastAPI 迁移
+
+##### 新增
+- **FastAPI 框架**: 使用 FastAPI 替代 http.server，提供更好的性能和自动 API 文档
+- **JWT 认证模块**: 支持用户登录和 Token 认证，预置测试账号
+- **数据库初始化模块**: 自动创建用户表和训练数据表
+- **Pydantic 数据模型**: 完整的请求/响应模型定义
+- **路由模块化设计**:
+  - `routers/auth.py`: 登录接口
+  - `routers/sessions.py`: 训练数据上传/查询
+  - `routers/dashboard.py`: Dashboard 数据接口 (7个端点)
+  - `routers/llm.py`: LLM 分析接口 (3个端点)
+- **环境变量配置**: `.env.example` 支持灵活配置
+
+##### 优化
+- 更新 Dockerfile 使用 uvicorn 启动
+- 简化 docker-compose.yml 配置
+- 存档旧 http.server 实现到 `_archive_http_server/`
+
+##### 技术栈更新
+- 新增依赖: FastAPI, uvicorn, python-jose, passlib, python-multipart
 
 ### v2.3.0 (2026-03-21)
 
