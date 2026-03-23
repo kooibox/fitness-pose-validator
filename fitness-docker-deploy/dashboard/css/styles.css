@@ -968,6 +968,13 @@ body {
 }
 
 /* Responsive Design */
+/* ===========================================
+   Responsive Design - 合并所有媒体查询
+   =========================================== */
+
+/* Desktop Large (> 1400px) - 默认样式 */
+
+/* Tablet Large (1024px - 1400px) */
 @media (max-width: 1400px) {
     .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -982,35 +989,18 @@ body {
     }
 }
 
+/* Tablet (768px - 1024px) */
 @media (max-width: 1024px) {
     .header {
         flex-wrap: wrap;
         gap: var(--spacing-md);
+        padding: var(--spacing-sm) var(--spacing-lg);
     }
     
     .nav {
         order: 3;
         width: 100%;
         justify-content: center;
-    }
-    
-    .sessions-content {
-        grid-template-columns: 1fr;
-    }
-    
-    .ability-content {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* ===========================================
-   Mobile Responsive Design
-   =========================================== */
-
-/* Tablet (768px - 1024px) */
-@media (max-width: 1024px) {
-    .header {
-        padding: var(--spacing-sm) var(--spacing-lg);
     }
     
     .main-content {
@@ -1021,17 +1011,20 @@ body {
         grid-template-columns: repeat(2, 1fr);
     }
     
-    .charts-grid {
+    .charts-row {
         grid-template-columns: 1fr;
     }
     
-    .trend-content,
+    .sessions-content {
+        grid-template-columns: 1fr;
+    }
+    
     .ability-content {
         grid-template-columns: 1fr;
     }
     
-    .sessions-list {
-        grid-template-columns: repeat(2, 1fr);
+    .trend-content {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1050,7 +1043,6 @@ body {
         font-size: 14px;
     }
     
-    /* Header Mobile */
     .header {
         flex-direction: column;
         padding: var(--spacing-sm) var(--spacing-md);
@@ -1075,7 +1067,6 @@ body {
         font-size: 0.65rem;
     }
     
-    /* Navigation Mobile */
     .nav {
         width: 100%;
         justify-content: space-around;
@@ -1089,7 +1080,6 @@ body {
         flex-direction: column;
         padding: var(--spacing-xs) var(--spacing-sm);
         gap: var(--spacing-xs);
-        font-size: 0.7rem;
     }
     
     .nav-btn svg {
@@ -1098,10 +1088,9 @@ body {
     }
     
     .nav-btn span {
-        font-size: 0.65rem;
+        display: none;
     }
     
-    /* Header Right Mobile */
     .header-right {
         width: 100%;
         justify-content: space-between;
@@ -1109,8 +1098,7 @@ body {
     }
     
     .time-range-selector {
-        display: flex;
-        gap: var(--spacing-xs);
+        display: none;
     }
     
     .time-btn {
@@ -1123,7 +1111,6 @@ body {
         min-width: auto;
     }
     
-    /* Main Content Mobile */
     .main-content {
         padding: var(--spacing-md);
     }
@@ -1140,7 +1127,6 @@ body {
         font-size: 0.8rem;
     }
     
-    /* KPI Cards Mobile */
     .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: var(--spacing-sm);
@@ -1168,12 +1154,7 @@ body {
         font-size: 0.7rem;
     }
     
-    .kpi-change {
-        font-size: 0.7rem;
-    }
-    
-    /* Charts Mobile */
-    .charts-grid {
+    .charts-row {
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
     }
@@ -1193,58 +1174,31 @@ body {
         font-size: 0.9rem;
     }
     
-    .chart-value {
-        font-size: 1.1rem;
-    }
-    
     .chart-container {
         height: 200px;
     }
     
-    /* Sessions List Mobile */
-    .sessions-list {
+    .sessions-content {
         grid-template-columns: 1fr;
-        gap: var(--spacing-md);
     }
     
-    .session-card {
-        padding: var(--spacing-md);
-    }
-    
-    .session-header {
-        flex-direction: column;
-        gap: var(--spacing-xs);
-    }
-    
-    .session-stats {
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-sm);
-    }
-    
-    /* Trend & Ability Pages Mobile */
-    .trend-content,
     .ability-content {
         grid-template-columns: 1fr;
-        gap: var(--spacing-md);
     }
     
-    .trend-chart-card,
-    .ability-radar-card,
-    .ability-stats-card {
-        padding: var(--spacing-md);
+    .trend-content {
+        grid-template-columns: 1fr;
     }
     
-    /* Table Mobile */
-    .recent-sessions-table {
+    .data-table {
         font-size: 0.75rem;
     }
     
-    .recent-sessions-table th,
-    .recent-sessions-table td {
+    .data-table th,
+    .data-table td {
         padding: var(--spacing-xs) var(--spacing-sm);
     }
     
-    /* Scrollbar Mobile */
     ::-webkit-scrollbar {
         width: 4px;
         height: 4px;
@@ -1261,16 +1215,8 @@ body {
         grid-template-columns: 1fr;
     }
     
-    .nav-btn span {
-        display: none;
-    }
-    
     .nav-btn {
         padding: var(--spacing-xs);
-    }
-    
-    .time-range-selector {
-        display: none;
     }
     
     .chart-container {

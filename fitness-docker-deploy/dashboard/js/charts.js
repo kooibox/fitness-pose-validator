@@ -2,17 +2,25 @@
  * Charts Module - ECharts 图表配置
  */
 
-// 检测是否为移动端
-const isMobile = window.matchMedia('(max-width: 768px)').matches;
-const isSmallMobile = window.matchMedia('(max-width: 480px)').matches;
+// 动态检测移动端状态
+function getIsMobile() {
+    return window.matchMedia('(max-width: 768px)').matches;
+}
 
-// 移动端字体大小调整
-const fontSize = {
-    xs: isSmallMobile ? 8 : (isMobile ? 9 : 10),
-    sm: isSmallMobile ? 9 : (isMobile ? 10 : 11),
-    md: isSmallMobile ? 10 : (isMobile ? 11 : 12),
-    lg: isSmallMobile ? 11 : (isMobile ? 12 : 14)
-};
+function getIsSmallMobile() {
+    return window.matchMedia('(max-width: 480px)').matches;
+}
+
+function getFontSize() {
+    const isMobile = getIsMobile();
+    const isSmallMobile = getIsSmallMobile();
+    return {
+        xs: isSmallMobile ? 8 : (isMobile ? 9 : 10),
+        sm: isSmallMobile ? 9 : (isMobile ? 10 : 11),
+        md: isSmallMobile ? 10 : (isMobile ? 11 : 12),
+        lg: isSmallMobile ? 11 : (isMobile ? 12 : 14)
+    };
+}
 
 // 全局主题配置
 const chartTheme = {
@@ -53,11 +61,11 @@ const colors = {
     gradient: ['#00F5A0', '#00D9FF']
 };
 
-// 趋势图配置
 function createTrendChart(container, data) {
     const chart = echarts.init(container);
+    const isMobile = getIsMobile();
+    const fontSize = getFontSize();
     
-    // 移动端优化：减少数据点显示
     let displayLabels = data.labels;
     let displayValues = data.values;
     
@@ -89,9 +97,7 @@ function createTrendChart(container, data) {
                 interval: isMobile ? 'auto' : 0,
                 formatter: (value) => {
                     const date = new Date(value);
-                    return isMobile ? 
-                        `${date.getMonth() + 1}/${date.getDate()}` :
-                        `${date.getMonth() + 1}/${date.getDate()}`;
+                    return `${date.getMonth() + 1}/${date.getDate()}`;
                 }
             },
             axisTick: { show: false }
@@ -149,9 +155,10 @@ function createTrendChart(container, data) {
     return chart;
 }
 
-// 雷达图配置
 function createRadarChart(container, data) {
     const chart = echarts.init(container);
+    const isMobile = getIsMobile();
+    const fontSize = getFontSize();
     
     const maxValues = data.dimensions.map(() => 100);
     
@@ -159,17 +166,18 @@ function createRadarChart(container, data) {
         ...chartTheme,
         radar: {
             indicator: data.dimensions.map((name, i) => ({
-                name: isMobile ? name.slice(0, 2) : name,  // 移动端缩短名称
+                name: isMobile ? name.slice(0, 2) : name,
                 max: maxValues[i]
             })),
             shape: 'polygon',
             splitNumber: 5,
-            center: ['50%', '50%'],
-            radius: isMobile ? '55%' : '65%',
+            center: ['50%', '55%'],
+            radius: isMobile ? '48%' : '60%',
             axisName: {
                 color: '#9CA3AF',
                 fontSize: fontSize.md,
-                fontWeight: 500
+                fontWeight: 500,
+                padding: isMobile ? [0, 0] : [0, 0]
             },
             splitLine: {
                 lineStyle: {
@@ -198,7 +206,7 @@ function createRadarChart(container, data) {
                 value: data.values,
                 name: '能力值',
                 symbol: 'circle',
-                symbolSize: 8,
+                symbolSize: 6,
                 lineStyle: {
                     color: colors.primary,
                     width: 2
@@ -222,9 +230,10 @@ function createRadarChart(container, data) {
     return chart;
 }
 
-// 时段分布图配置
 function createTimeDistChart(container, data) {
     const chart = echarts.init(container);
+    const isMobile = getIsMobile();
+    const fontSize = getFontSize();
     
     const option = {
         ...chartTheme,
@@ -295,9 +304,10 @@ function createTimeDistChart(container, data) {
     return chart;
 }
 
-// 深度分布图配置
 function createDepthDistChart(container, data) {
     const chart = echarts.init(container);
+    const isMobile = getIsMobile();
+    const fontSize = getFontSize();
     
     const option = {
         ...chartTheme,
@@ -308,19 +318,23 @@ function createDepthDistChart(container, data) {
         },
         legend: {
             orient: isMobile ? 'horizontal' : 'vertical',
-            right: isMobile ? 'center' : '5%',
-            top: isMobile ? 'bottom' : 'center',
-            bottom: isMobile ? '0%' : undefined,
+            left: isMobile ? 'center' : undefined,
+            right: isMobile ? undefined : '5%',
+            top: isMobile ? undefined : 'center',
+            bottom: isMobile ? '5%' : undefined,
             textStyle: {
                 color: '#9CA3AF',
                 fontSize: fontSize.sm
-            }
+            },
+            itemGap: isMobile ? 8 : 12,
+            itemWidth: 14,
+            itemHeight: 10
         },
         series: [{
             type: 'pie',
-            radius: isMobile ? ['30%', '55%'] : ['40%', '70%'],
-            center: isMobile ? ['50%', '45%'] : ['40%', '50%'],
-            avoidLabelOverlap: false,
+            radius: isMobile ? ['25%', '50%'] : ['40%', '70%'],
+            center: isMobile ? ['50%', '40%'] : ['40%', '50%'],
+            avoidLabelOverlap: true,
             itemStyle: {
                 borderRadius: 6,
                 borderColor: '#0A0F1C',
@@ -359,11 +373,11 @@ function createDepthDistChart(container, data) {
     return chart;
 }
 
-// 详细趋势图配置
 function createTrendDetailChart(container, data) {
     const chart = echarts.init(container);
+    const isMobile = getIsMobile();
+    const fontSize = getFontSize();
     
-    // 移动端优化：减少数据点
     let displayLabels = data.labels;
     let displayValues = data.values;
     
