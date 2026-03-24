@@ -6,6 +6,7 @@
 
 import json
 from pathlib import Path
+from typing import Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QFont
@@ -20,13 +21,12 @@ from src.config import Config
 
 
 class SettingRow(QWidget):
-    """单行设置项组件"""
     
-    def __init__(self, label: str, widget: QWidget, description: str = None, parent=None):
+    def __init__(self, label: str, widget: QWidget, description: Optional[str] = None, parent=None):
         super().__init__(parent)
         self._init_ui(label, widget, description)
     
-    def _init_ui(self, label: str, widget: QWidget, description: str):
+    def _init_ui(self, label: str, widget: QWidget, description: Optional[str]):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
@@ -52,10 +52,9 @@ class SettingRow(QWidget):
 
 
 class SliderWithLabel(QWidget):
-    """带数值显示的滑块组件"""
     
     def __init__(self, min_val: int, max_val: int, default_val: int, 
-                 suffix: str = "", format_str: str = None, parent=None):
+                 suffix: str = "", format_str: Optional[str] = None, parent=None):
         super().__init__(parent)
         self._suffix = suffix
         self._format_str = format_str
@@ -389,24 +388,58 @@ class SettingsPage(QWidget):
         layout.setSpacing(12)
         
         self._server_url = QLineEdit()
-        self._server_url.setPlaceholderText("http://117.72.185.244:8080/api/v1/sessions/upload")
-        self._server_url.setFixedWidth(280)
+        self._server_url.setPlaceholderText("http://117.72.185.244/api/v1/sessions/upload")
+        self._server_url.setFixedWidth(320)
         row1 = SettingRow("服务器地址", self._server_url, "数据上传的目标服务器URL")
         layout.addWidget(row1)
         
-        self._api_key = QLineEdit()
-        self._api_key.setPlaceholderText("test-api-key-12345")
-        self._api_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self._api_key.setFixedWidth(280)
-        row2 = SettingRow("API密钥", self._api_key, "用于身份验证的访问密钥")
+        self._username = QLineEdit()
+        self._username.setPlaceholderText("demo")
+        self._username.setFixedWidth(160)
+        row2 = SettingRow("用户名", self._username, "登录账号")
         layout.addWidget(row2)
         
-        self._auto_upload = QCheckBox("训练结束后自动上传数据")
-        self._auto_upload.setChecked(False)
-        layout.addWidget(self._auto_upload)
+        self._password = QLineEdit()
+        self._password.setPlaceholderText("••••••")
+        self._password.setEchoMode(QLineEdit.EchoMode.Password)
+        self._password.setFixedWidth(160)
+        row3 = SettingRow("密码", self._password, "登录密码")
+        layout.addWidget(row3)
+        
+        status_container = QWidget()
+        status_layout = QHBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self._login_status = QLabel("● 未登录")
+        self._login_status.setStyleSheet("color: #EF4444; font-weight: 500;")
+        status_layout.addWidget(self._login_status)
+        status_layout.addStretch()
+        
+        row_status = SettingRow("登录状态", status_container)
+        layout.addWidget(row_status)
         
         btn_row = QHBoxLayout()
         btn_row.addStretch()
+        
+        self._login_btn = QPushButton("登录")
+        self._login_btn.setMinimumHeight(36)
+        self._login_btn.setMinimumWidth(100)
+        self._login_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #059669;
+            }
+        """)
+        self._login_btn.clicked.connect(self._handle_login)
+        btn_row.addWidget(self._login_btn)
+        
         self._test_btn = QPushButton("测试连接")
         self._test_btn.setMinimumHeight(36)
         self._test_btn.setStyleSheet("""
@@ -424,7 +457,32 @@ class SettingsPage(QWidget):
         """)
         self._test_btn.clicked.connect(self._test_server_connection)
         btn_row.addWidget(self._test_btn)
+        
+        self._logout_btn = QPushButton("登出")
+        self._logout_btn.setMinimumHeight(36)
+        self._logout_btn.setMinimumWidth(100)
+        self._logout_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #EF4444;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #DC2626;
+            }
+        """)
+        self._logout_btn.clicked.connect(self._handle_logout)
+        self._logout_btn.setVisible(False)
+        btn_row.addWidget(self._logout_btn)
+        
         layout.addLayout(btn_row)
+        
+        self._auto_upload = QCheckBox("训练结束后自动上传数据")
+        self._auto_upload.setChecked(False)
+        layout.addWidget(self._auto_upload)
         
         layout.addStretch()
         
@@ -470,6 +528,96 @@ class SettingsPage(QWidget):
             btn.setChecked(i == index)
         self._stack.setCurrentIndex(index)
     
+    def _handle_login(self):
+        from PyQt6.QtWidgets import QMessageBox
+        import urllib.request
+        import urllib.error
+        import json
+        from urllib.parse import urlparse
+        
+        username = self._username.text().strip()
+        password = self._password.text().strip()
+        server_url = self._server_url.text().strip()
+        
+        if not username or not password:
+            QMessageBox.warning(self, "登录失败", "请输入用户名和密码")
+            return
+        
+        if not server_url:
+            QMessageBox.warning(self, "登录失败", "请输入服务器地址")
+            return
+        
+        try:
+            parsed = urlparse(server_url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+            login_url = f"{base_url}/api/v1/auth/login"
+            
+            data = json.dumps({"username": username, "password": password}).encode('utf-8')
+            
+            request = urllib.request.Request(
+                login_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            
+            with urllib.request.urlopen(request, timeout=10) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                
+                if "access_token" in result:
+                    self._settings["auth_token"] = result["access_token"]
+                    self._settings["username"] = username
+                    self._update_login_status(True, username)
+                    self._save_token_to_file(result["access_token"], username)
+                    QMessageBox.information(self, "登录成功", f"欢迎, {username}!")
+                else:
+                    QMessageBox.warning(self, "登录失败", "服务器未返回有效Token")
+                    
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                QMessageBox.warning(self, "登录失败", "用户名或密码错误")
+            else:
+                QMessageBox.warning(self, "登录失败", f"服务器错误: {e.code}")
+        except urllib.error.URLError as e:
+            QMessageBox.warning(self, "登录失败", f"无法连接到服务器:\n{e}")
+        except Exception as e:
+            QMessageBox.warning(self, "登录失败", f"登录时出错:\n{e}")
+    
+    def _handle_logout(self):
+        from PyQt6.QtWidgets import QMessageBox
+        
+        self._settings["auth_token"] = None
+        self._settings["username"] = None
+        self._update_login_status(False)
+        
+        self._save_token_to_file(None, None)
+        
+        QMessageBox.information(self, "已登出", "您已成功登出")
+    
+    def _update_login_status(self, is_logged_in: bool, username: Optional[str] = None):
+        if is_logged_in:
+            self._login_status.setText(f"● 已登录 ({username})")
+            self._login_status.setStyleSheet("color: #10B981; font-weight: 500;")
+            self._login_btn.setVisible(False)
+            self._logout_btn.setVisible(True)
+        else:
+            self._login_status.setText("● 未登录")
+            self._login_status.setStyleSheet("color: #EF4444; font-weight: 500;")
+            self._login_btn.setVisible(True)
+            self._logout_btn.setVisible(False)
+    
+    def _save_token_to_file(self, token: Optional[str], username: Optional[str]):
+        if token:
+            self._settings["auth_token"] = token
+            self._settings["username"] = username
+        else:
+            self._settings.pop("auth_token", None)
+            self._settings.pop("username", None)
+        
+        self.CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(self._settings, f, indent=2, ensure_ascii=False)
+    
     def _test_server_connection(self):
         from PyQt6.QtWidgets import QMessageBox
         import urllib.request
@@ -477,7 +625,6 @@ class SettingsPage(QWidget):
         from urllib.parse import urlparse
         
         server_url = self._server_url.text().strip()
-        api_key = self._api_key.text().strip()
         
         if not server_url:
             QMessageBox.warning(self, "测试失败", "请输入服务器地址")
@@ -489,8 +636,6 @@ class SettingsPage(QWidget):
             test_url = f"{base_url}/api/v1/dashboard/overview"
             
             request = urllib.request.Request(test_url, method="GET")
-            if api_key:
-                request.add_header("Authorization", f"Bearer {api_key}")
             
             with urllib.request.urlopen(request, timeout=10) as response:
                 QMessageBox.information(self, "连接成功", f"服务器响应: {response.status}")
@@ -543,10 +688,15 @@ class SettingsPage(QWidget):
         
         if "server_url" in self._settings:
             self._server_url.setText(self._settings["server_url"])
-        if "api_key" in self._settings:
-            self._api_key.setText(self._settings["api_key"])
+        if "username" in self._settings:
+            self._username.setText(self._settings["username"])
         if "auto_upload" in self._settings:
             self._auto_upload.setChecked(self._settings["auto_upload"])
+        
+        if "auth_token" in self._settings and self._settings["auth_token"]:
+            self._update_login_status(True, self._settings.get("username", ""))
+        else:
+            self._update_login_status(False)
     
     def _save_settings(self):
         settings = {
@@ -567,8 +717,9 @@ class SettingsPage(QWidget):
             "buffer_size": self._buffer_size.value(),
             
             "server_url": self._server_url.text(),
-            "api_key": self._api_key.text(),
+            "username": self._username.text(),
             "auto_upload": self._auto_upload.isChecked(),
+            "auth_token": self._settings.get("auth_token"),
         }
         
         self.CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)

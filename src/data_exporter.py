@@ -163,6 +163,7 @@ class DataExporter:
         session_id: int, 
         server_url: str,
         auth_token: Optional[str] = None,
+        exercise_type: str = "squat",
         compress: bool = True,
         timeout: int = 30
     ) -> Dict[str, Any]:
@@ -172,7 +173,8 @@ class DataExporter:
         Args:
             session_id: 会话ID
             server_url: 服务器URL
-            auth_token: 认证令牌
+            auth_token: JWT认证令牌
+            exercise_type: 运动类型 (squat/pushup/lunge)
             compress: 是否压缩数据
             timeout: 请求超时时间（秒）
             
@@ -183,11 +185,11 @@ class DataExporter:
             urllib.error.URLError: 网络错误
             urllib.error.HTTPError: HTTP错误
         """
-        # 导出数据
         data = self.export_session(session_id)
+        data["exercise_type"] = exercise_type
+        
         json_bytes = json.dumps(data, ensure_ascii=False).encode('utf-8')
         
-        # 压缩数据
         if compress:
             body = gzip.compress(json_bytes)
             content_encoding = "gzip"
@@ -195,7 +197,6 @@ class DataExporter:
             body = json_bytes
             content_encoding = None
         
-        # 构建请求
         headers = {
             "Content-Type": "application/json",
             "User-Agent": f"{self.APP_ID}/{self.CLIENT_VERSION}"
@@ -207,7 +208,6 @@ class DataExporter:
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
         
-        # 发送请求
         request = urllib.request.Request(
             server_url,
             data=body,
@@ -297,18 +297,21 @@ class DataUploader:
     数据上传器（轻量级版本）
     
     专为嵌入式环境设计，最小化内存使用。
+    支持 JWT 认证和运动类型标识。
     """
     
-    def __init__(self, server_url: str, auth_token: Optional[str] = None):
+    def __init__(self, server_url: str, auth_token: Optional[str] = None, exercise_type: str = "squat"):
         """
         初始化上传器
         
         Args:
             server_url: 服务器URL
-            auth_token: 认证令牌
+            auth_token: JWT认证令牌
+            exercise_type: 运动类型 (squat/pushup/lunge)
         """
         self.server_url = server_url
         self.auth_token = auth_token
+        self.exercise_type = exercise_type
         self.exporter = DataExporter()
     
     def upload(self, session_id: int, compress: bool = True) -> bool:
@@ -327,6 +330,7 @@ class DataUploader:
                 session_id=session_id,
                 server_url=self.server_url,
                 auth_token=self.auth_token,
+                exercise_type=self.exercise_type,
                 compress=compress
             )
             return result.get("status") == "success"
