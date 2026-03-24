@@ -2,32 +2,88 @@
  * App Module - 应用主逻辑
  */
 
-// 全局状态
 const state = {
     currentPage: 'overview',
     currentRange: 'today',
+    currentExerciseType: null,
     charts: {},
     sessions: [],
     selectedSession: null,
     isLoading: false
 };
 
-// 使用 MockAPI 还是真实 API
-const api = window.API; // 使用真实服务器
+const api = window.API;
 
-// ============ 初始化 ============
 document.addEventListener('DOMContentLoaded', () => {
+    initAuth();
+});
+
+async function initAuth() {
+    if (Auth.isLoggedIn()) {
+        document.getElementById('loginModal').classList.add('hidden');
+        showUserInfo();
+        initApp();
+    } else {
+        document.getElementById('loginModal').classList.remove('hidden');
+        initLoginForm();
+    }
+}
+
+function initLoginForm() {
+    const form = document.getElementById('loginForm');
+    const errorEl = document.getElementById('loginError');
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const btn = document.getElementById('loginBtn');
+        
+        btn.disabled = true;
+        errorEl.style.display = 'none';
+        
+        try {
+            await Auth.login(username, password);
+            document.getElementById('loginModal').classList.add('hidden');
+            showUserInfo();
+            initApp();
+        } catch (error) {
+            errorEl.textContent = error.message;
+            errorEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
+function showUserInfo() {
+    const user = Auth.getUser();
+    if (user) {
+        const userInfoEl = document.getElementById('userInfo');
+        const avatarEl = document.getElementById('userAvatar');
+        const nameEl = document.getElementById('userName');
+        
+        userInfoEl.style.display = 'flex';
+        avatarEl.textContent = user.username ? user.username.charAt(0).toUpperCase() : 'U';
+        nameEl.textContent = user.username || 'User';
+        
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            Auth.logout();
+        });
+    }
+}
+
+function initApp() {
     initNavigation();
     initTimeRangeSelector();
+    initExerciseSelector();
     initClock();
     loadPage(state.currentPage);
     
-    // 窗口大小改变时重绘图表
     window.addEventListener('resize', debounce(resizeCharts, 250));
-    
-    // 移动端触摸优化
     initMobileTouch();
-});
+}
 
 // ============ 导航 ============
 function initNavigation() {
@@ -70,6 +126,19 @@ function initTimeRangeSelector() {
             timeBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             state.currentRange = btn.dataset.range;
+            loadPage(state.currentPage);
+        });
+    });
+}
+
+function initExerciseSelector() {
+    const exerciseBtns = document.querySelectorAll('.exercise-btn');
+    
+    exerciseBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            exerciseBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.currentExerciseType = btn.dataset.type === 'squat' ? null : btn.dataset.type;
             loadPage(state.currentPage);
         });
     });
@@ -122,12 +191,11 @@ async function loadPage(pageName) {
 
 // ============ 概览页 ============
 async function loadOverview() {
-    // 并行加载数据
     const [overview, trend, radar, sessions] = await Promise.all([
-        api.getOverview(),
-        api.getTrend('squats', '7d'),
-        api.getRadar(),
-        api.getRecentSessions(5)
+        api.getOverview(state.currentExerciseType),
+        api.getTrend('squats', '7d', state.currentExerciseType),
+        api.getRadar(state.currentExerciseType),
+        api.getRecentSessions(5, state.currentExerciseType)
     ]);
     
     // 更新 KPI 卡片
@@ -230,9 +298,9 @@ async function loadTrends() {
                  : state.currentRange === 'month' ? '30d' : '90d';
     
     const [trend, timeDist, depthDist] = await Promise.all([
-        api.getTrend('squats', period),
-        api.getDistribution('time_of_day'),
-        api.getDistribution('depth')
+        api.getTrend('squats', period, state.currentExerciseType),
+        api.getDistribution('time_of_day', null, state.currentExerciseType),
+        api.getDistribution('depth', null, state.currentExerciseType)
     ]);
     
     // 渲染详细趋势图
@@ -280,7 +348,7 @@ function updateTrendInsights() {
 
 // ============ 训练页 ============
 async function loadSessions() {
-    const sessions = await api.getRecentSessions(20);
+    const sessions = await api.getRecentSessions(20, state.currentExerciseType);
     state.sessions = sessions;
     
     renderSessionsList(sessions);
@@ -334,9 +402,6 @@ async function showSessionDetail(sessionId) {
     
     if (!session) return;
     
-    // 请求分析
-    const analysis = await api.requestAnalysis([sessionId], 'session');
-    
     detailCard.innerHTML = `
         <div class="session-detail-header">
             <h2>📋 训练报告</h2>
@@ -353,7 +418,7 @@ async function showSessionDetail(sessionId) {
                 <span class="detail-kpi-label">训练时长</span>
             </div>
             <div class="detail-kpi">
-                <span class="detail-kpi-value">${analysis?.score || 85}</span>
+                <span class="detail-kpi-value" id="sessionScore">--</span>
                 <span class="detail-kpi-label">质量评分</span>
             </div>
             <div class="detail-kpi">
@@ -378,31 +443,477 @@ async function showSessionDetail(sessionId) {
             </div>
         </div>
         
-        ${analysis ? `
-        <div class="detail-ai">
-            <h3>🤖 AI 分析</h3>
-            <p>${analysis.summary}</p>
-            <div class="ai-insights">
-                <h4>💡 洞察</h4>
-                <ul>
-                    ${analysis.insights.map(i => `<li>${i}</li>`).join('')}
-                </ul>
+        <div class="analysis-section">
+            <div class="analysis-header">
+                <h3>🤖 AI 智能分析</h3>
+                <div class="analysis-type-selector">
+                    <select id="analysisType" class="analysis-select">
+                        <option value="session">单次训练分析</option>
+                        <option value="trend">趋势分析</option>
+                        <option value="comparison">对比分析</option>
+                        <option value="advice">个性化建议</option>
+                        <option value="goal">目标设定</option>
+                    </select>
+                    <button class="analyze-btn" id="startAnalysis">
+                        开始分析
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <div class="ai-suggestions">
-                <h4>📝 建议</h4>
-                <ul>
-                    ${analysis.suggestions.map(s => `<li>${s}</li>`).join('')}
-                </ul>
+            
+            <div class="analysis-result" id="analysisResult">
+                <div class="analysis-loading" id="analysisLoading" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <span>AI 正在分析中...</span>
+                </div>
+                
+                <div class="analysis-content" id="analysisContent" style="display: none;"></div>
+            </div>
+        </div>
+    `;
+    
+    addDetailStyles();
+    addAnalysisStyles();
+    renderSessionAngleChart();
+    
+    document.getElementById('startAnalysis').addEventListener('click', async () => {
+        const analysisType = document.getElementById('analysisType').value;
+        await runAnalysis(sessionId, analysisType);
+    });
+    
+    await runAnalysis(sessionId, 'session');
+}
+
+async function runAnalysis(sessionId, analysisType) {
+    const loadingEl = document.getElementById('analysisLoading');
+    const contentEl = document.getElementById('analysisContent');
+    const scoreEl = document.getElementById('sessionScore');
+    
+    loadingEl.style.display = 'flex';
+    contentEl.style.display = 'none';
+    
+    try {
+        const analysis = await api.requestAnalysis([sessionId], analysisType);
+        
+        if (analysis) {
+            renderAnalysisResult(analysis);
+            
+            if (analysis.score) {
+                scoreEl.textContent = analysis.score.toFixed(1);
+            }
+        }
+    } catch (error) {
+        contentEl.innerHTML = `<p class="error-text">分析失败: ${error.message}</p>`;
+        contentEl.style.display = 'block';
+    } finally {
+        loadingEl.style.display = 'none';
+    }
+}
+
+function renderAnalysisResult(analysis) {
+    const container = document.getElementById('analysisContent');
+    
+    if (!analysis) {
+        container.innerHTML = '<p class="no-data">暂无分析结果</p>';
+        container.style.display = 'block';
+        return;
+    }
+    
+    const isRawMode = analysis.metadata && analysis.metadata.raw_response === true;
+    
+    const score = analysis.score || 0;
+    const scoreLevel = getScoreLevel(score);
+    const scoreColor = getScoreColor(score);
+    
+    const insights = analysis.insights || [];
+    const suggestions = analysis.suggestions || [];
+    
+    let insightsHtml = '';
+    if (isRawMode && insights.length === 0) {
+        insightsHtml = '<p class="no-data-text">详细洞察将在优化后显示</p>';
+    } else {
+        insightsHtml = `
+            <ul class="insight-list">
+                ${insights.map(insight => `
+                    <li class="insight-item">
+                        <span class="insight-dot"></span>
+                        <span>${insight}</span>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    }
+    
+    let suggestionsHtml = '';
+    if (isRawMode && suggestions.length === 0) {
+        suggestionsHtml = '<p class="no-data-text">详细建议将在优化后显示</p>';
+    } else if (suggestions.length > 0) {
+        suggestionsHtml = `
+            <div class="suggestion-cards">
+                ${suggestions.map((suggestion, i) => `
+                    <div class="suggestion-card">
+                        <span class="suggestion-num">${i + 1}</span>
+                        <p>${suggestion}</p>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    const displayMetadata = analysis.metadata 
+        ? Object.entries(analysis.metadata).filter(([key]) => shouldDisplayMetadata(key))
+        : [];
+    
+    container.innerHTML = `
+        <div class="analysis-score">
+            <div class="score-circle" style="background: conic-gradient(${scoreColor} ${score * 3.6}deg, var(--bg-tertiary) 0deg)">
+                <div class="score-inner">
+                    <span class="score-value">${score.toFixed(1)}</span>
+                    <span class="score-label">${scoreLevel}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="analysis-summary">
+            <h4>📝 训练总结</h4>
+            <p>${analysis.summary || '暂无总结'}</p>
+        </div>
+        
+        <div class="analysis-insights">
+            <h4>💡 深度洞察</h4>
+            ${insightsHtml}
+        </div>
+        
+        ${suggestionsHtml ? `
+        <div class="analysis-suggestions">
+            <h4>📌 改进建议</h4>
+            ${suggestionsHtml}
+        </div>
+        ` : ''}
+        
+        ${displayMetadata.length > 0 ? `
+        <div class="analysis-metadata">
+            <h4>📊 详细评估</h4>
+            <div class="metadata-grid">
+                ${displayMetadata.map(([key, value]) => `
+                    <div class="metadata-item">
+                        <span class="metadata-label">${formatMetadataKey(key)}</span>
+                        <span class="metadata-value">${formatMetadataValue(value)}</span>
+                    </div>
+                `).join('')}
             </div>
         </div>
         ` : ''}
+        
+        <div class="analysis-timestamp">
+            分析时间: ${formatDateTime(analysis.completed_at || new Date().toISOString())}
+        </div>
     `;
     
-    // 添加详情页样式
-    addDetailStyles();
+    container.style.display = 'block';
+}
+
+function getScoreLevel(score) {
+    if (score >= 90) return '卓越';
+    if (score >= 80) return '优秀';
+    if (score >= 70) return '良好';
+    if (score >= 60) return '一般';
+    return '待提升';
+}
+
+function getScoreColor(score) {
+    if (score >= 80) return 'var(--accent-primary)';
+    if (score >= 60) return 'var(--accent-warning)';
+    return 'var(--accent-danger)';
+}
+
+function formatMetadataKey(key) {
+    const keyMap = {
+        'depth_assessment': '深度评估',
+        'symmetry_assessment': '对称性评估',
+        'stability_assessment': '稳定性评估',
+        'trend_direction': '趋势方向',
+        'improvement_rate': '进步幅度',
+        'current_level': '当前水平',
+        'total_squats': '总深蹲数',
+        'avg_depth': '平均深度',
+        'symmetry_score': '对称性评分',
+    };
+    return keyMap[key] || key;
+}
+
+function formatMetadataValue(value) {
+    if (value === null || value === undefined) {
+        return '--';
+    }
+    if (typeof value === 'boolean') {
+        return value ? '是' : '否';
+    }
+    if (typeof value === 'number') {
+        if (value < 1 && value > -1 && value !== 0) {
+            return (value * 100).toFixed(1) + '%';
+        }
+        return value.toFixed(1);
+    }
+    if (typeof value === 'string') {
+        const valueMap = {
+            '良好': '<span class="tag-success">良好</span>',
+            '一般': '<span class="tag-warning">一般</span>',
+            '需改进': '<span class="tag-danger">需改进</span>',
+            '上升': '<span class="tag-success">↑ 上升</span>',
+            '平稳': '<span class="tag-info">→ 平稳</span>',
+            '下降': '<span class="tag-danger">↓ 下降</span>',
+        };
+        return valueMap[value] || value;
+    }
+    return String(value);
+}
+
+function shouldDisplayMetadata(key) {
+    const hiddenKeys = ['raw_response', 'json_parse_error', 'error'];
+    return !hiddenKeys.includes(key);
+}
+
+function addAnalysisStyles() {
+    if (document.getElementById('analysisStyles')) return;
     
-    // 渲染角度曲线图 (mock data)
-    renderSessionAngleChart();
+    const style = document.createElement('style');
+    style.id = 'analysisStyles';
+    style.textContent = `
+        .analysis-section {
+            margin-top: var(--spacing-xl);
+            padding: var(--spacing-lg);
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(0, 245, 160, 0.1);
+        }
+        
+        .analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+        }
+        
+        .analysis-header h3 {
+            font-size: 1rem;
+            color: var(--accent-primary);
+        }
+        
+        .analysis-type-selector {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+        
+        .analysis-select {
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+        
+        .analyze-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: var(--bg-primary);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .analyze-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 10px rgba(0, 245, 160, 0.3);
+        }
+        
+        .analyze-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .analysis-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-md);
+            padding: var(--spacing-xl);
+            color: var(--text-muted);
+        }
+        
+        .analysis-score {
+            display: flex;
+            justify-content: center;
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .score-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .score-inner {
+            width: 100px;
+            height: 100px;
+            background: var(--bg-secondary);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .score-value {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+        }
+        
+        .score-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .analysis-summary,
+        .analysis-insights,
+        .analysis-suggestions,
+        .analysis-metadata {
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .analysis-summary h4,
+        .analysis-insights h4,
+        .analysis-suggestions h4,
+        .analysis-metadata h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+            color: var(--text-secondary);
+        }
+        
+        .analysis-summary p {
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        .insight-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .insight-item {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .insight-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            margin-top: 8px;
+            flex-shrink: 0;
+        }
+        
+        .suggestion-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-sm);
+        }
+        
+        .suggestion-card {
+            display: flex;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .suggestion-num {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--bg-primary);
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        
+        .suggestion-card p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--spacing-sm);
+        }
+        
+        .metadata-item {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+        }
+        
+        .metadata-label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+        
+        .metadata-value {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .analysis-timestamp {
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: var(--spacing-md);
+        }
+        
+        .no-data-text {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            padding: var(--spacing-md);
+            text-align: center;
+        }
+        
+        .error-text {
+            color: var(--accent-danger);
+            text-align: center;
+            padding: var(--spacing-lg);
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 function renderSessionAngleChart() {
@@ -602,7 +1113,7 @@ window.viewSessionDetail = function(sessionId) {
 
 // ============ 能力页 ============
 async function loadAbility() {
-    const radar = await api.getRadar();
+    const radar = await api.getRadar(state.currentExerciseType);
     
     // 渲染雷达图
     if (radar) {
