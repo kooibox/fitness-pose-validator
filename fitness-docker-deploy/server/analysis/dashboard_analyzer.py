@@ -43,12 +43,13 @@ class DashboardAnalyzer:
         """获取数据库连接"""
         return sqlite3.connect(self.db_path)
     
-    def get_overview_stats(self, client_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_overview_stats(self, client_id: Optional[int] = None, exercise_type: Optional[str] = None) -> Dict[str, Any]:
         """
         获取概览统计数据
         
         Args:
             client_id: 可选，指定客户端ID
+            exercise_type: 可选，运动类型过滤
             
         Returns:
             dict: 概览统计
@@ -57,12 +58,17 @@ class DashboardAnalyzer:
         cursor = conn.cursor()
         
         try:
-            # 基础查询条件
-            where_clause = ""
+            where_conditions = []
             params = []
             if client_id:
-                where_clause = "WHERE s.client_id = ?"
-                params = [client_id]
+                where_conditions.append("s.client_id = ?")
+                params.append(client_id)
+            
+            if exercise_type:
+                where_conditions.append("s.exercise_type = ?")
+                params.append(exercise_type)
+            
+            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
             
             # 总训练次数
             cursor.execute(f"SELECT COUNT(*) FROM uploaded_sessions s {where_clause}", params)
@@ -128,7 +134,8 @@ class DashboardAnalyzer:
         self,
         metric: str = "squats",
         period: str = "30d",
-        client_id: Optional[int] = None
+        client_id: Optional[int] = None,
+        exercise_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取趋势数据
@@ -137,6 +144,7 @@ class DashboardAnalyzer:
             metric: 指标类型 ('squats', 'sessions', 'duration')
             period: 时间范围 ('7d', '30d', '90d', 'all')
             client_id: 可选，指定客户端ID
+            exercise_type: 可选，运动类型过滤
             
         Returns:
             dict: 趋势数据 {"labels": [...], "values": [...]}
@@ -145,23 +153,25 @@ class DashboardAnalyzer:
         cursor = conn.cursor()
         
         try:
-            # 计算日期范围
             if period == "7d":
                 start_date = datetime.now() - timedelta(days=7)
             elif period == "30d":
                 start_date = datetime.now() - timedelta(days=30)
             elif period == "90d":
                 start_date = datetime.now() - timedelta(days=90)
-            else:  # 'all'
+            else:
                 start_date = datetime(2020, 1, 1)
             
-            # 基础查询条件
             where_conditions = ["s.start_time >= ?"]
             params = [start_date.isoformat()]
             
             if client_id:
                 where_conditions.append("s.client_id = ?")
                 params.append(client_id)
+            
+            if exercise_type:
+                where_conditions.append("s.exercise_type = ?")
+                params.append(exercise_type)
             
             where_clause = " AND ".join(where_conditions)
             
@@ -210,7 +220,8 @@ class DashboardAnalyzer:
         self,
         metric: str = "depth",
         session_id: Optional[int] = None,
-        client_id: Optional[int] = None
+        client_id: Optional[int] = None,
+        exercise_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取分布数据
@@ -219,6 +230,7 @@ class DashboardAnalyzer:
             metric: 分布类型 ('depth', 'state', 'time_of_day')
             session_id: 可选，指定会话ID
             client_id: 可选，指定客户端ID
+            exercise_type: 可选，运动类型过滤
             
         Returns:
             dict: 分布数据 {"labels": [...], "values": [...]}
@@ -228,7 +240,6 @@ class DashboardAnalyzer:
         
         try:
             if metric == "depth":
-                # 深度分布：按角度范围统计
                 if session_id:
                     cursor.execute("""
                         SELECT 
@@ -244,7 +255,16 @@ class DashboardAnalyzer:
                         GROUP BY depth_range
                     """, (session_id,))
                 else:
-                    cursor.execute("""
+                    where_conditions = ["r.state = 'SQUATTING'"]
+                    params = []
+                    
+                    if exercise_type:
+                        where_conditions.append("s.exercise_type = ?")
+                        params.append(exercise_type)
+                    
+                    where_clause = "WHERE " + " AND ".join(where_conditions)
+                    
+                    cursor.execute(f"""
                         SELECT 
                             CASE
                                 WHEN r.avg_angle < 90 THEN '深度 (<90°)'
@@ -255,9 +275,9 @@ class DashboardAnalyzer:
                             COUNT(*) as count
                         FROM uploaded_records r
                         JOIN uploaded_sessions s ON r.session_id = s.id
-                        WHERE r.state = 'SQUATTING'
+                        {where_clause}
                         GROUP BY depth_range
-                    """)
+                    """, params)
                 
                 rows = cursor.fetchall()
                 return {
@@ -321,7 +341,8 @@ class DashboardAnalyzer:
     def get_heatmap_data(
         self,
         period: str = "90d",
-        client_id: Optional[int] = None
+        client_id: Optional[int] = None,
+        exercise_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取热力图数据（每日训练强度）
@@ -329,6 +350,7 @@ class DashboardAnalyzer:
         Args:
             period: 时间范围 ('30d', '90d', '180d', 'all')
             client_id: 可选，指定客户端ID
+            exercise_type: 可选，运动类型过滤
             
         Returns:
             dict: 热力图数据 {"data": [{"date": "...", "value": N}, ...]}
@@ -337,23 +359,25 @@ class DashboardAnalyzer:
         cursor = conn.cursor()
         
         try:
-            # 计算日期范围
             if period == "30d":
                 start_date = datetime.now() - timedelta(days=30)
             elif period == "90d":
                 start_date = datetime.now() - timedelta(days=90)
             elif period == "180d":
                 start_date = datetime.now() - timedelta(days=180)
-            else:  # 'all'
+            else:
                 start_date = datetime(2020, 1, 1)
             
-            # 基础查询条件
             where_conditions = ["start_time >= ?"]
             params = [start_date.isoformat()]
             
             if client_id:
                 where_conditions.append("client_id = ?")
                 params.append(client_id)
+            
+            if exercise_type:
+                where_conditions.append("exercise_type = ?")
+                params.append(exercise_type)
             
             where_clause = " AND ".join(where_conditions)
             
@@ -389,7 +413,7 @@ class DashboardAnalyzer:
         finally:
             conn.close()
     
-    def get_radar_data(self, client_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_radar_data(self, client_id: Optional[int] = None, exercise_type: Optional[str] = None) -> Dict[str, Any]:
         """
         获取雷达图数据（多维度能力评估）
         
@@ -402,6 +426,7 @@ class DashboardAnalyzer:
         
         Args:
             client_id: 可选，指定客户端ID
+            exercise_type: 可选，运动类型过滤
             
         Returns:
             dict: 雷达图数据
@@ -410,12 +435,17 @@ class DashboardAnalyzer:
         cursor = conn.cursor()
         
         try:
-            # 获取最近的会话数据
-            where_clause = ""
+            where_conditions = []
             params = []
             if client_id:
-                where_clause = "WHERE s.client_id = ?"
-                params = [client_id]
+                where_conditions.append("s.client_id = ?")
+                params.append(client_id)
+            
+            if exercise_type:
+                where_conditions.append("s.exercise_type = ?")
+                params.append(exercise_type)
+            
+            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
             
             # 获取最近10个会话的记录
             cursor.execute(f"""
@@ -502,13 +532,14 @@ class DashboardAnalyzer:
         finally:
             conn.close()
     
-    def get_best_records(self, limit: int = 5, client_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_best_records(self, limit: int = 5, client_id: Optional[int] = None, exercise_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         获取最佳表现记录
         
         Args:
             limit: 返回数量限制
             client_id: 可选，指定客户端ID
+            exercise_type: 可选，运动类型过滤
             
         Returns:
             list: 最佳记录列表
@@ -517,11 +548,17 @@ class DashboardAnalyzer:
         cursor = conn.cursor()
         
         try:
-            where_clause = ""
+            where_conditions = []
             params = []
             if client_id:
-                where_clause = "WHERE s.client_id = ?"
-                params = [client_id]
+                where_conditions.append("s.client_id = ?")
+                params.append(client_id)
+            
+            if exercise_type:
+                where_conditions.append("s.exercise_type = ?")
+                params.append(exercise_type)
+            
+            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
             
             # 按深蹲次数排序
             cursor.execute(f"""
@@ -549,13 +586,14 @@ class DashboardAnalyzer:
         finally:
             conn.close()
     
-    def get_recent_sessions(self, limit: int = 10, client_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_recent_sessions(self, limit: int = 10, client_id: Optional[int] = None, exercise_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         获取最近的训练会话
         
         Args:
             limit: 返回数量限制
             client_id: 可选，指定客户端ID
+            exercise_type: 可选，运动类型过滤
             
         Returns:
             list: 会话列表
@@ -564,11 +602,17 @@ class DashboardAnalyzer:
         cursor = conn.cursor()
         
         try:
-            where_clause = ""
+            where_conditions = []
             params = []
             if client_id:
-                where_clause = "WHERE s.client_id = ?"
-                params = [client_id]
+                where_conditions.append("s.client_id = ?")
+                params.append(client_id)
+            
+            if exercise_type:
+                where_conditions.append("s.exercise_type = ?")
+                params.append(exercise_type)
+            
+            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
             
             cursor.execute(f"""
                 SELECT s.id, s.client_session_id, s.start_time, s.end_time,

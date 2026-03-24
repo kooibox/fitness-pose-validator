@@ -5,84 +5,90 @@
 const API_BASE = '/api/v1';
 
 const API = {
-    // 获取概览统计
-    async getOverview(clientId = null) {
+    async _fetch(url, options = {}) {
+        const headers = {
+            ...options.headers,
+            ...Auth.getAuthHeaders()
+        };
+        
+        const response = await fetch(url, { ...options, headers });
+        
+        if (response.status === 401) {
+            Auth.logout();
+            throw new Error('登录已过期，请重新登录');
+        }
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.detail || '请求失败');
+        }
+        
+        return data;
+    },
+    
+    async getOverview(exerciseType = null) {
         let url = `${API_BASE}/dashboard/overview`;
-        if (clientId) url += `?client_id=${encodeURIComponent(clientId)}`;
+        const params = [];
+        if (exerciseType) params.push(`exercise_type=${encodeURIComponent(exerciseType)}`);
+        if (params.length) url += `?${params.join('&')}`;
         
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await this._fetch(url);
         return data.status === 'success' ? data.data : null;
     },
     
-    // 获取趋势数据
-    async getTrend(metric = 'squats', period = '30d', clientId = null) {
+    async getTrend(metric = 'squats', period = '30d', exerciseType = null) {
         let url = `${API_BASE}/dashboard/trend?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}`;
-        if (clientId) url += `&client_id=${encodeURIComponent(clientId)}`;
+        if (exerciseType) url += `&exercise_type=${encodeURIComponent(exerciseType)}`;
         
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await this._fetch(url);
         return data.status === 'success' ? data.data : null;
     },
     
-    // 获取分布数据
-    async getDistribution(metric = 'depth', sessionId = null, clientId = null) {
+    async getDistribution(metric = 'depth', exerciseType = null) {
         let url = `${API_BASE}/dashboard/distribution?metric=${encodeURIComponent(metric)}`;
-        if (sessionId) url += `&session_id=${encodeURIComponent(sessionId)}`;
-        if (clientId) url += `&client_id=${encodeURIComponent(clientId)}`;
+        if (exerciseType) url += `&exercise_type=${encodeURIComponent(exerciseType)}`;
         
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await this._fetch(url);
         return data.status === 'success' ? data.data : null;
     },
     
-    // 获取热力图数据
-    async getHeatmap(period = '90d', clientId = null) {
+    async getHeatmap(period = '90d', exerciseType = null) {
         let url = `${API_BASE}/dashboard/heatmap?period=${encodeURIComponent(period)}`;
-        if (clientId) url += `&client_id=${encodeURIComponent(clientId)}`;
+        if (exerciseType) url += `&exercise_type=${encodeURIComponent(exerciseType)}`;
         
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await this._fetch(url);
         return data.status === 'success' ? data.data : null;
     },
     
-    // 获取雷达图数据
-    async getRadar(clientId = null) {
+    async getRadar(exerciseType = null) {
         let url = `${API_BASE}/dashboard/radar`;
-        if (clientId) url += `?client_id=${encodeURIComponent(clientId)}`;
+        if (exerciseType) url += `?exercise_type=${encodeURIComponent(exerciseType)}`;
         
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await this._fetch(url);
         return data.status === 'success' ? data.data : null;
     },
     
-    // 获取最佳记录
-    async getBestRecords(limit = 5, clientId = null) {
+    async getBestRecords(limit = 5, exerciseType = null) {
         let url = `${API_BASE}/dashboard/best-records?limit=${limit}`;
-        if (clientId) url += `&client_id=${encodeURIComponent(clientId)}`;
+        if (exerciseType) url += `&exercise_type=${encodeURIComponent(exerciseType)}`;
         
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await this._fetch(url);
         return data.status === 'success' ? data.data : [];
     },
     
-    // 获取最近会话
-    async getRecentSessions(limit = 10, clientId = null) {
+    async getRecentSessions(limit = 10, exerciseType = null) {
         let url = `${API_BASE}/dashboard/recent-sessions?limit=${limit}`;
-        if (clientId) url += `&client_id=${encodeURIComponent(clientId)}`;
+        if (exerciseType) url += `&exercise_type=${encodeURIComponent(exerciseType)}`;
         
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await this._fetch(url);
         return data.status === 'success' ? data.data : [];
     },
     
-    // LLM 分析
     async requestAnalysis(sessionIds, analysisType = 'session', context = null) {
-        const response = await fetch(`${API_BASE}/llm/analyze`, {
+        const data = await this._fetch(`${API_BASE}/llm/analyze`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 session_ids: sessionIds,
                 analysis_type: analysisType,
@@ -91,26 +97,20 @@ const API = {
             })
         });
         
-        const data = await response.json();
         return data.status === 'success' ? data.data : null;
     },
     
-    // 获取分析状态
     async getAnalysisStatus(requestId) {
-        const response = await fetch(`${API_BASE}/llm/status/${requestId}`);
-        const data = await response.json();
+        const data = await this._fetch(`${API_BASE}/llm/status/${requestId}`);
         return data.status === 'success' ? data.data : null;
     },
     
-    // 获取分析类型
     async getAnalysisTypes() {
-        const response = await fetch(`${API_BASE}/llm/types`);
-        const data = await response.json();
+        const data = await this._fetch(`${API_BASE}/llm/types`);
         return data.status === 'success' ? data.data : [];
     }
 };
 
-// Mock Data for Development
 const MockAPI = {
     async getOverview() {
         await this._delay(500);
@@ -223,6 +223,5 @@ const MockAPI = {
     }
 };
 
-// Export
 window.API = API;
 window.MockAPI = MockAPI;
