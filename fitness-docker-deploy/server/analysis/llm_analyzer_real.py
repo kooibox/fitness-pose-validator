@@ -208,14 +208,26 @@ class LLMAnalyzerReal(LLMAnalyzerInterface):
             raise Exception(f"API请求失败: {str(e)}")
     
     def _extract_json_from_text(self, text: str) -> str:
-        """从文本中提取JSON字符串"""
         import re
         
-        # 移除markdown代码块
+        text = text.strip()
+        
         text = re.sub(r'```json\s*', '', text)
         text = re.sub(r'```\s*$', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^```.*$', '', text, flags=re.MULTILINE)
         
-        # 查找第一个完整的JSON对象
+        depth = 0
+        start = -1
+        for i, char in enumerate(text):
+            if char == '{':
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0 and start != -1:
+                    return text[start:i+1]
+        
         match = re.search(r'\{[\s\S]*\}', text)
         if match:
             return match.group()
@@ -243,18 +255,32 @@ class LLMAnalyzerReal(LLMAnalyzerInterface):
             json_str = self._extract_json_from_text(llm_output)
             data = json.loads(json_str)
             
+            insights = data.get("insights", [])
+            if insights is None:
+                insights = []
+            elif isinstance(insights, str):
+                insights = [insights]
+            
+            suggestions = data.get("suggestions", [])
+            if suggestions is None:
+                suggestions = []
+            elif isinstance(suggestions, str):
+                suggestions = [suggestions]
+            
             return LLMAnalysisResponse(
                 request_id=request_id,
                 status=AnalysisStatus.COMPLETED,
-                summary=data.get("summary", ""),
-                insights=data.get("insights", []),
-                suggestions=data.get("suggestions", []),
+                summary=data.get("summary", "") or "",
+                insights=insights,
+                suggestions=suggestions,
                 score=data.get("score"),
                 metadata=data.get("metadata"),
                 completed_at=datetime.now().isoformat(),
             )
         
         except json.JSONDecodeError as e:
+            print(f"[LLM] JSON解析失败: {e}")
+            print(f"[LLM] 原始输出前500字符: {llm_output[:500]}")
             return LLMAnalysisResponse(
                 request_id=request_id,
                 status=AnalysisStatus.COMPLETED,
@@ -263,6 +289,18 @@ class LLMAnalyzerReal(LLMAnalyzerInterface):
                 suggestions=[],
                 score=None,
                 metadata={"raw_response": True, "json_parse_error": str(e)},
+                completed_at=datetime.now().isoformat(),
+            )
+        except Exception as e:
+            print(f"[LLM] 解析异常: {e}")
+            return LLMAnalysisResponse(
+                request_id=request_id,
+                status=AnalysisStatus.COMPLETED,
+                summary=llm_output,
+                insights=[],
+                suggestions=[],
+                score=None,
+                metadata={"raw_response": True, "error": str(e)},
                 completed_at=datetime.now().isoformat(),
             )
     
