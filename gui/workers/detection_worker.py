@@ -277,8 +277,12 @@ class DetectionWorker(QThread):
         from src.squat_counter import PoseState
         
         if metrics.rep_count > self._last_rep_count:
-            if self._form_analyzer.is_rep_valid():
+            rep_score = self._form_analyzer.get_rep_score()
+            if rep_score.is_valid:
                 self._valid_rep_count += 1
+            print(f"深蹲 #{metrics.rep_count}: 错误比例={rep_score.error_ratio:.1%}, "
+                  f"有效阈值={rep_score.valid_threshold:.1%}, 质量={rep_score.quality_score:.0f}分, "
+                  f"有效={'✓' if rep_score.is_valid else '✗'}")
             self._form_analyzer.start_new_rep()
             self._last_rep_count = metrics.rep_count
             self.valid_count_updated.emit(self._valid_rep_count, metrics.rep_count)
