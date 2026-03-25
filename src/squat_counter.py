@@ -147,6 +147,7 @@ class PeakDetector:
             curr_angle < prev_angle
             and curr_angle < next_angle
             and curr_angle < self.VALLEY_THRESHOLD
+            and curr_angle > 10.0
         )
 
         if is_valley:
