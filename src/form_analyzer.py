@@ -50,8 +50,8 @@ STRICTNESS_CONFIG = {
         # 背部弯曲阈值
         "back_error_angle": 35.0,        # 更宽松
         "back_warning_angle": 25.0,
-        # 容忍度（错误帧占比超过此值才算无效）
-        "error_tolerance": 0.5,          # 50%以上的帧有错误才无效
+        # 容忍度（综合错误分数超过此值才算无效）
+        "error_tolerance": 0.5,          # 综合错误分数 > 0.5 才无效
     },
     StrictnessLevel.NORMAL: {
         "depth_error_angle": 115.0,
@@ -60,7 +60,7 @@ STRICTNESS_CONFIG = {
         "knee_valgus_warning": 0.25,
         "back_error_angle": 25.0,
         "back_warning_angle": 15.0,
-        "error_tolerance": 0.3,          # 30%以上的帧有错误才无效
+        "error_tolerance": 0.3,          # 综合错误分数 > 0.3 才无效
     },
     StrictnessLevel.STRICT: {
         "depth_error_angle": 100.0,      # 更严格
@@ -69,9 +69,38 @@ STRICTNESS_CONFIG = {
         "knee_valgus_warning": 0.2,
         "back_error_angle": 20.0,        # 更严格
         "back_warning_angle": 12.0,
-        "error_tolerance": 0.15,         # 15%以上的帧有错误就无效
+        "error_tolerance": 0.15,         # 综合错误分数 > 0.15 就无效
     },
 }
+
+
+# 错误类型权重配置（用于加权错误分数计算）
+# 权重越高，表示该错误对有效计数的影响越大
+ERROR_WEIGHTS = {
+    FeedbackType.KNEE_VALGUS: 1.5,          # 膝盖内扣 - 危险度高，权重最大
+    FeedbackType.BACK_BENT: 1.2,            # 背部弯曲 - 中等风险
+    FeedbackType.DEPTH_INSUFFICIENT: 1.0,   # 深度不足 - 基础权重
+    FeedbackType.TOO_FAST: 0.5,             # 速度过快 - 低风险
+    FeedbackType.GOOD_FORM: 0.0,            # 动作标准 - 无惩罚
+    FeedbackType.DEEP_ENOUGH: 0.0,          # 深度足够 - 无惩罚
+}
+
+# WARNING级别的权重系数（相对于ERROR的折算比例）
+WARNING_WEIGHT_RATIO = 0.3
+
+
+@dataclass
+class RepScore:
+    """单次深蹲评分详情"""
+    total_frames: int
+    error_frames: int
+    error_ratio: float
+    weighted_error_score: float
+    penalty_score: float
+    final_score: float
+    quality_score: float
+    valid_threshold: float
+    is_valid: bool
 
 
 @dataclass
@@ -141,6 +170,12 @@ class FormAnalyzer:
         
         self._squat_frame_count = 0
         self._error_frame_count = 0
+        
+        # 加权错误分数系统
+        self._weighted_error_score: float = 0.0
+        self._consecutive_errors: int = 0
+        self._penalty_score: float = 0.0
+        self._max_possible_weight: float = 0.0  # 用于归一化
     
     def set_strictness(self, level: StrictnessLevel):
         self._strictness = level
@@ -152,13 +187,60 @@ class FormAnalyzer:
     def start_new_rep(self):
         self._squat_frame_count = 0
         self._error_frame_count = 0
+        self._weighted_error_score = 0.0
+        self._consecutive_errors = 0
+        self._penalty_score = 0.0
+        self._max_possible_weight = 0.0
     
     def is_rep_valid(self) -> bool:
+        return self._calculate_rep_score().is_valid
+    
+    def get_rep_score(self) -> RepScore:
+        return self._calculate_rep_score()
+    
+    def _calculate_rep_score(self) -> RepScore:
         if self._squat_frame_count == 0:
-            return True
-        tolerance = self._config["error_tolerance"]
+            return RepScore(
+                total_frames=0,
+                error_frames=0,
+                error_ratio=0.0,
+                weighted_error_score=0.0,
+                penalty_score=0.0,
+                final_score=0.0,
+                quality_score=100.0,
+                valid_threshold=self._config["error_tolerance"],
+                is_valid=True,
+            )
+        
+        base_tolerance = self._config["error_tolerance"]
+        
         error_ratio = self._error_frame_count / self._squat_frame_count
-        return error_ratio < tolerance
+        
+        avg_error_weight = 1.0
+        if self._error_frame_count > 0:
+            avg_error_weight = self._weighted_error_score / self._error_frame_count
+        
+        danger_modifier = max(0, (avg_error_weight - 1.0) * 0.3)
+        valid_threshold = base_tolerance * (1 - danger_modifier)
+        
+        penalty_ratio = self._penalty_score / self._squat_frame_count
+        adjusted_error_ratio = error_ratio + penalty_ratio * 0.1
+        
+        final_score = adjusted_error_ratio
+        quality_score = max(0, (1 - final_score) * 100)
+        is_valid = adjusted_error_ratio < valid_threshold
+        
+        return RepScore(
+            total_frames=self._squat_frame_count,
+            error_frames=self._error_frame_count,
+            error_ratio=error_ratio,
+            weighted_error_score=self._weighted_error_score,
+            penalty_score=self._penalty_score,
+            final_score=final_score,
+            quality_score=quality_score,
+            valid_threshold=valid_threshold,
+            is_valid=is_valid,
+        )
     
     def analyze(
         self, 
@@ -207,8 +289,34 @@ class FormAnalyzer:
                 message="动作标准",
             ))
         
-        if state == PoseState.SQUATTING and any(fb.severity == Severity.ERROR for fb in feedbacks):
-            self._error_frame_count += 1
+        # 加权错误分数计算
+        if state == PoseState.SQUATTING:
+            frame_error_score = 0.0
+            has_error = False
+            has_warning = False
+            
+            for fb in feedbacks:
+                if fb.severity == Severity.ERROR:
+                    has_error = True
+                    weight = ERROR_WEIGHTS.get(fb.type, 1.0)
+                    frame_error_score += weight
+                elif fb.severity == Severity.WARNING:
+                    has_warning = True
+            
+            if has_warning and not has_error:
+                frame_error_score += WARNING_WEIGHT_RATIO
+            
+            self._weighted_error_score += frame_error_score
+            
+            if frame_error_score > 0:
+                self._consecutive_errors += 1
+                if self._consecutive_errors > 3:
+                    self._penalty_score += 0.1 * (self._consecutive_errors - 3)
+            else:
+                self._consecutive_errors = 0
+            
+            if has_error:
+                self._error_frame_count += 1
         
         overall = self._get_overall_severity(feedbacks)
         depth_pct = self._calculate_depth_percentage(knee_angle)
