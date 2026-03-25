@@ -4,7 +4,7 @@
 提供姿态检测结果的图形化渲染功能。
 """
 
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -18,13 +18,8 @@ class Visualizer:
     可视化渲染器类
     
     负责在视频帧上渲染姿态关键点、骨骼连线和统计信息。
-    
-    Attributes:
-        frame_width: 帧宽度
-        frame_height: 帧高度
     """
     
-    # 颜色定义 (BGR格式)
     COLOR_GREEN = (0, 255, 0)
     COLOR_BLUE = (255, 0, 0)
     COLOR_RED = (0, 0, 255)
@@ -34,20 +29,13 @@ class Visualizer:
     COLOR_WHITE = (255, 255, 255)
     
     def __init__(self, frame_width: int, frame_height: int):
-        """
-        初始化可视化渲染器。
-        
-        Args:
-            frame_width: 视频帧宽度
-            frame_height: 视频帧高度
-        """
         self.frame_width = frame_width
         self.frame_height = frame_height
     
     def render_frame(
         self,
         frame: np.ndarray,
-        pose_landmarks: Optional[List],
+        pose_data: Optional[Dict],
         metrics: Optional[SquatMetrics],
         frame_count: int,
         pose_count: int,
@@ -57,7 +45,7 @@ class Visualizer:
         
         Args:
             frame: 原始视频帧
-            pose_landmarks: MediaPipe 姿态检测结果 (List[List[Landmark]])
+            pose_data: 检测结果字典 {'normalized': ..., 'world': ...}
             metrics: 深蹲指标
             frame_count: 总帧数
             pose_count: 检测到姿态的帧数
@@ -65,8 +53,9 @@ class Visualizer:
         Returns:
             np.ndarray: 渲染后的视频帧
         """
-        # 提取第一个人的关键点
-        landmarks = pose_landmarks[0] if pose_landmarks else None
+        landmarks = None
+        if pose_data and pose_data.get('normalized'):
+            landmarks = pose_data['normalized'][0]
         
         if landmarks is None:
             self._draw_no_pose_warning(frame)

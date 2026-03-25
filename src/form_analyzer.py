@@ -15,14 +15,12 @@ from src.squat_counter import PoseState
 
 
 class FeedbackType(Enum):
-    """反馈类型枚举"""
-    DEPTH_INSUFFICIENT = "depth_insufficient"  # 下蹲不够深
-    DEEP_ENOUGH = "deep_enough"                # 下蹲深度足够
-    KNEE_VALGUS = "knee_valgus"                # 膝盖内扣
-    BACK_BENT = "back_bent"                    # 背部弯曲
-    TORSO_LEAN = "torso_lean"                  # 身体过度前倾
-    TOO_FAST = "too_fast"                      # 动作过快
-    GOOD_FORM = "good_form"                    # 动作标准
+    DEPTH_INSUFFICIENT = "depth_insufficient"
+    DEEP_ENOUGH = "deep_enough"
+    KNEE_VALGUS = "knee_valgus"
+    BACK_BENT = "back_bent"
+    TOO_FAST = "too_fast"
+    GOOD_FORM = "good_form"
 
 
 class Severity(Enum):
@@ -132,13 +130,6 @@ class FormAnalyzer:
     VELOCITY_WARNING = 80.0
     VELOCITY_ERROR = 120.0
     
-    TRIGGER_FRAMES = {
-        FeedbackType.KNEE_VALGUS: 5,
-        FeedbackType.BACK_BENT: 5,
-        FeedbackType.DEPTH_INSUFFICIENT: 3,
-        FeedbackType.TOO_FAST: 2,
-    }
-    
     def __init__(self, history_size: int = 30, strictness: StrictnessLevel = StrictnessLevel.NORMAL):
         self._history_size = history_size
         self._strictness = strictness
@@ -146,7 +137,6 @@ class FormAnalyzer:
         
         self._angle_history: deque = deque(maxlen=history_size)
         self._time_history: deque = deque(maxlen=history_size)
-        self._frame_counters: Dict[FeedbackType, int] = {}
         self._last_analysis: Optional[FormAnalysis] = None
         
         self._squat_frame_count = 0
@@ -172,15 +162,20 @@ class FormAnalyzer:
     
     def analyze(
         self, 
-        landmarks: List, 
+        pose_data: Optional[Dict], 
         knee_angle: float,
         state: PoseState,
         timestamp: float
     ) -> FormAnalysis:
-        if not landmarks or len(landmarks[0]) < 29:
+        if not pose_data:
             return self._empty_analysis()
         
-        person = landmarks[0]
+        normalized_landmarks = pose_data.get('normalized')
+        
+        if not normalized_landmarks or len(normalized_landmarks[0]) < 29:
+            return self._empty_analysis()
+        
+        person = normalized_landmarks[0]
         feedbacks: List[FormFeedback] = []
         
         knee_valgus_score = self._check_knee_valgus(person)
@@ -189,8 +184,6 @@ class FormAnalyzer:
         
         if state == PoseState.SQUATTING:
             self._squat_frame_count += 1
-        
-        if state == PoseState.SQUATTING:
             depth_feedback = self._check_depth(knee_angle)
             if depth_feedback:
                 feedbacks.append(depth_feedback)
@@ -265,7 +258,6 @@ class FormAnalyzer:
         if ratio >= 1.0:
             return 0.0
         else:
-            # 归一化到 0-1
             return min(1.0, (1.0 - ratio) * 2)
     
     def _calculate_back_angle(self, landmarks) -> float:
@@ -465,8 +457,6 @@ class FormAnalyzer:
         return self._last_analysis
     
     def reset(self):
-        """重置分析器状态"""
         self._angle_history.clear()
         self._time_history.clear()
-        self._frame_counters.clear()
         self._last_analysis = None

@@ -41,3 +41,10 @@ docker-data/
 *.tmp
 *.bak
 *.cache
+
+# Test data (large files)
+test/data/samples/*.csv
+test/data/samples/*.mp4
+
+# Runtime data
+data/

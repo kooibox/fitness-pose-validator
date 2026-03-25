@@ -17,13 +17,17 @@ class Config:
     DATABASE_PATH: Path = PROJECT_ROOT / "data" / "fitness_data.db"
     
     # ========== 深蹲计数配置 ==========
-    STANDING_ANGLE_THRESHOLD: float = 165.0
-    SQUAT_ANGLE_THRESHOLD: float = 90.0
+    # 深蹲阈值设置说明：
+    # - 站立阈值：需要低于用户实际最大站立角度（你的数据约163°）
+    # - 下蹲阈值：需要高于用户实际最小下蹲角度（你的数据约49°）
+    STANDING_ANGLE_THRESHOLD: float = 155.0  # 进一步降低
+    SQUAT_ANGLE_THRESHOLD: float = 90.0      # 略微放宽
     
     # ========== MediaPipe 配置 ==========
-    POSE_DETECTION_CONFIDENCE: float = 0.5
-    POSE_PRESENCE_CONFIDENCE: float = 0.5
-    POSE_TRACKING_CONFIDENCE: float = 0.5
+    # 提高置信度阈值以获得更稳定的结果
+    POSE_DETECTION_CONFIDENCE: float = 0.6   # 原值0.5
+    POSE_PRESENCE_CONFIDENCE: float = 0.6    # 原值0.5
+    POSE_TRACKING_CONFIDENCE: float = 0.6    # 原值0.5
     MAX_NUM_POSES: int = 1
     
     # ========== 摄像头配置 ==========
