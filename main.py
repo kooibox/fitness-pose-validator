@@ -130,21 +130,18 @@ class FitnessPoseValidator:
                 # 转换颜色空间
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
-                # 姿态检测
                 timestamp_ms = int((frame_count + 1) * 1000 / self._fps)
-                landmarks = self._pose_detector.detect(rgb_frame, timestamp_ms)
+                pose_data = self._pose_detector.detect(rgb_frame, timestamp_ms)
                 
                 frame_count += 1
                 
-                # 更新计数器
                 metrics = None
-                if landmarks:
+                if pose_data:
                     pose_count += 1
-                    metrics = self._squat_counter.update(landmarks)
+                    metrics = self._squat_counter.update(pose_data)
                 
-                # 渲染可视化
                 frame = self._visualizer.render_frame(
-                    frame, landmarks, metrics, frame_count, pose_count
+                    frame, pose_data, metrics, frame_count, pose_count
                 )
                 
                 # 显示帧

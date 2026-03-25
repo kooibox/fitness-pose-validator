@@ -66,29 +66,32 @@ class PoseDetector:
         )
         return vision.PoseLandmarker.create_from_options(options)
     
-    def detect(self, frame, timestamp_ms: int) -> Optional[List]:
+    def detect(self, frame, timestamp_ms: int) -> Optional[dict]:
         """
         检测单帧图像中的姿态。
         
         Args:
-            frame: BGR格式的图像帧（OpenCV格式）
+            frame: RGB格式的图像帧
             timestamp_ms: 帧时间戳（毫秒）
             
         Returns:
-            Optional[List]: 检测到的姿态关键点列表，无检测结果返回None
-                           每个元素是一个人的关键点列表
+            Optional[dict]: 检测结果字典，包含:
+                - 'normalized': 归一化坐标的关键点列表
+                - 'world': 3D世界坐标的关键点列表
+            无检测结果返回None
         """
-        # 创建 MediaPipe 图像对象
         mp_image = mp.Image(
             image_format=mp.ImageFormat.SRGB,
             data=frame,
         )
         
-        # 执行检测
         result = self._landmarker.detect_for_video(mp_image, timestamp_ms)
         
         if result.pose_landmarks:
-            return result.pose_landmarks
+            return {
+                'normalized': result.pose_landmarks,
+                'world': result.pose_world_landmarks,
+            }
         return None
     
     def close(self) -> None:

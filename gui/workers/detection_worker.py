@@ -5,7 +5,7 @@
 """
 
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -17,6 +17,7 @@ from src.database import Database
 from src.pose_detector import PoseDetector
 from src.squat_counter import SquatCounter, SquatMetrics
 from src.form_analyzer import FormAnalyzer, FormAnalysis, Severity, StrictnessLevel
+from src.adaptive_threshold import AdaptiveThresholdManager
 
 
 def put_chinese_text(
@@ -131,6 +132,9 @@ class DetectionWorker(QThread):
         # 配置
         self._rotate_frame = True
         self._camera_index = Config.CAMERA_INDEX
+        self._threshold_manager = AdaptiveThresholdManager()
+        self._threshold_calibration_interval = 300
+        self._last_threshold_calibration_frame = 0
     
     @property
     def session_id(self) -> Optional[int]:
@@ -184,36 +188,29 @@ class DetectionWorker(QThread):
                 # 转换颜色空间
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
-                # 姿态检测
                 timestamp_ms = int((self._frame_count + 1) * 1000 / Config.CAMERA_FPS)
-                landmarks = self._pose_detector.detect(rgb_frame, timestamp_ms)
+                pose_data = self._pose_detector.detect(rgb_frame, timestamp_ms)
                 
                 self._frame_count += 1
                 
-                # 更新计数器
                 metrics = None
                 form_analysis = None
-                if landmarks:
+                if pose_data:
                     self._pose_count += 1
-                    metrics = self._squat_counter.update(landmarks)
+                    metrics = self._squat_counter.update(pose_data)
                     
-                    # 动作姿态分析
                     current_time = time.time()
                     form_analysis = self._form_analyzer.analyze(
-                        landmarks,
+                        pose_data,
                         metrics.avg_knee_angle,
                         metrics.state,
                         current_time
                     )
                     
-                    # 更新有效计数
                     self._update_valid_count(metrics, form_analysis)
-                    
-                    # 发射反馈信号
                     self._emit_feedback(form_analysis)
-                    
-                    # 渲染骨骼
-                    frame = self._render_landmarks(frame, landmarks, metrics, form_analysis)
+                    self._update_adaptive_threshold(metrics)
+                    frame = self._render_landmarks(frame, pose_data, metrics, form_analysis)
                 
                 # 发射信号
                 self.frame_ready.emit(frame)
@@ -286,6 +283,18 @@ class DetectionWorker(QThread):
             self._last_rep_count = metrics.rep_count
             self.valid_count_updated.emit(self._valid_rep_count, metrics.rep_count)
     
+    def _update_adaptive_threshold(self, metrics: SquatMetrics):
+        from src.squat_counter import PoseState
+        self._threshold_manager.add_sample(metrics.avg_knee_angle, metrics.state)
+        
+        if (self._frame_count - self._last_threshold_calibration_frame 
+            >= self._threshold_calibration_interval):
+            result = self._threshold_manager.calibrate()
+            if result and result.confidence > 0.7:
+                self._squat_counter.standing_threshold = result.standing_threshold
+                self._squat_counter.squat_threshold = result.squat_threshold
+                self._last_threshold_calibration_frame = self._frame_count
+    
     def _emit_feedback(self, form_analysis: Optional[FormAnalysis]):
         current_time = time.time()
         
@@ -354,16 +363,20 @@ class DetectionWorker(QThread):
     def _render_landmarks(
         self, 
         frame: np.ndarray, 
-        landmarks: List,
+        pose_data: Optional[Dict],
         metrics: SquatMetrics,
         form_analysis: Optional[FormAnalysis] = None
     ) -> np.ndarray:
         """渲染姿态关键点和骨骼，包含实时动作反馈"""
-        if not landmarks:
+        if not pose_data:
+            return frame
+        
+        normalized_landmarks = pose_data.get('normalized')
+        if not normalized_landmarks:
             return frame
         
         h, w = frame.shape[:2]
-        person_landmarks = landmarks[0]
+        person_landmarks = normalized_landmarks[0]
         
         # 根据分析结果确定骨骼颜色
         skeleton_color = (0, 255, 0)  # 默认绿色
@@ -414,22 +427,34 @@ class DetectionWorker(QThread):
             color=(0, 255, 0)
         )
         
+        # 绘制峰值检测计数（调试用）
+        if hasattr(metrics, 'peak_count') and metrics.peak_count > 0:
+            frame = put_chinese_text(
+                frame,
+                f"谷值检测: {metrics.peak_count}",
+                (20, 90),
+                font_size=20,
+                color=(0, 200, 255)
+            )
+        
         # 绘制状态
+        state_y = 130 if hasattr(metrics, 'peak_count') and metrics.peak_count > 0 else 90
         state_color = (0, 255, 0) if metrics.state.value == "STANDING" else (0, 165, 255)
         state_text = "站立" if metrics.state.value == "STANDING" else "下蹲"
         frame = put_chinese_text(
             frame,
             f"状态: {state_text}",
-            (20, 90),
+            (20, state_y),
             font_size=24,
             color=state_color
         )
         
         # 绘制角度信息
+        angle_y = state_y + 40
         frame = put_chinese_text(
             frame,
             f"膝角: {metrics.avg_knee_angle:.0f}°",
-            (20, 130),
+            (20, angle_y),
             font_size=20,
             color=(200, 200, 200)
         )
@@ -450,12 +475,12 @@ class DetectionWorker(QThread):
             self._squat_counter.reset()
         if self._form_analyzer:
             self._form_analyzer.reset()
+        self._threshold_manager.reset()
+        self._last_threshold_calibration_frame = 0
         self._frame_count = 0
         self._pose_count = 0
-        # 重置有效计数
         self._valid_rep_count = 0
         self._last_rep_count = 0
-        # 重置反馈状态
         self._current_feedback_text = ""
         self._current_feedback_color = (0, 255, 0)
         self._feedback_show_start = 0
