@@ -1,124 +1,92 @@
 # Fitness Pose Validator - Documentation
 
-## Quick Start
+## 文档目录结构
 
-### 1. Install Dependencies
+```
+docs/
+├── README.md                          # 本文档（文档目录说明）
+│
+├── algorithm/                         # 算法相关文档
+│   ├── ALGORITHM_EVALUATION_REPORT.md       # 算法评估报告
+│   ├── ALGORITHM_IMPROVEMENT_SUMMARY.md     # 算法改进摘要
+│   ├── FAST_SQUAT_DETECTION_IMPROVEMENT.md  # 快速深蹲检测优化
+│   ├── VALID_COUNT_IMPROVEMENT.md           # 有效计数改进方案
+│   └── VALIDITY_REVIEW_REPORT.md            # 多智能体有效性评审
+│
+├── architecture/                      # 架构设计文档
+│   ├── AGENT.md                           # AI代理配置指南
+│   ├── DATA_UPLOAD_DESIGN.md              # 数据上传功能设计
+│   └── pyqt6_design_proposal.md           # PyQt6界面设计方案
+│
+├── testing/                           # 测试文档
+│   ├── TEST_GUIDE.md                      # 算法精准度测试指南
+│   └── TEST_METHODS.md                    # 算法测试方法
+│
+└── deployment/                        # 部署构建文档
+    ├── FASTAPI_CLIENT_MIGRATION_GUIDE.md  # FastAPI迁移指南
+    ├── RK3566_DEPLOYMENT_GUIDE.md         # RK3566嵌入式部署
+    ├── WINDOWS_BUILD_GUIDE.md             # Windows打包指南
+    └── WINDOWS_OPTIMIZATION_GUIDE.md      # Windows平台优化
+```
+
+---
+
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Run Training Program
+### 2. 运行训练程序
 
 ```bash
+# Windows
 fitness-pose-validator\venv\Scripts\activate
+python main.py
+
+# Linux/macOS
+source venv/bin/activate
 python main.py
 ```
 
-### 3. View Analysis
+### 3. 启动GUI
 
 ```bash
-# List all sessions
-python analyze.py --list
-
-# Analyze specific session
-python analyze.py --session 3
-
-# Analyze and save chart
-python analyze.py --session 3 --save
+python run_gui.py
 ```
 
-## Project Structure
+---
 
-```
-fitness-pose-validator/
-├── src/                       # Source code
-│   ├── __init__.py
-│   ├── config.py             # Configuration constants
-│   ├── database.py           # SQLite database operations
-│   ├── pose_detector.py      # MediaPipe wrapper
-│   ├── squat_counter.py      # Squat counting logic
-│   ├── visualizer.py         # Visualization rendering
-│   └── analyzer.py           # Training data analysis
-├── models/                    # Model files
-│   └── pose_landmarker.task
-├── data/                      # Data storage
-│   ├── fitness_data.db       # SQLite database
-│   └── analysis/             # Analysis charts
-├── main.py                    # Main entry point
-├── analyze.py                 # Analysis CLI tool
-├── requirements.txt           # Python dependencies
-├── run.bat                    # Windows launcher
-└── docs/                      # Documentation
-    ├── AGENT.md              # AI context guide
-    └── ANALYSIS_GUIDE.md     # Analysis guide
-```
+## 算法核心配置
 
-## Configuration
-
-Edit `src/config.py` to customize:
+编辑 `src/config.py` 自定义阈值：
 
 ```python
-# Squat thresholds
-STANDING_ANGLE_THRESHOLD = 165.0  # Standing angle threshold
-SQUAT_ANGLE_THRESHOLD = 90.0      # Squat angle threshold
+STANDING_ANGLE_THRESHOLD = 165.0  # 站立角度阈值
+SQUAT_ANGLE_THRESHOLD = 90.0      # 下蹲角度阈值
 
-# Camera settings
-CAMERA_RESOLUTION = (1280, 720)
-CAMERA_FPS = 30
+CAMERA_RESOLUTION = (1280, 720)   # 摄像头分辨率
+CAMERA_FPS = 30                    # 帧率
 ```
 
-## Database Schema
+---
 
-### sessions Table
+## 关键参考
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | INTEGER | Session ID |
-| start_time | TEXT | Start timestamp |
-| end_time | TEXT | End timestamp |
-| total_frames | INTEGER | Total frames |
-| total_squats | INTEGER | Total squats |
+### MediaPipe姿态关键点
 
-### squat_records Table
+- 左侧: HIP=23, KNEE=25, ANKLE=27
+- 右侧: HIP=24, KNEE=26, ANKLE=28
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | INTEGER | Record ID |
-| session_id | INTEGER | Session ID (FK) |
-| timestamp | TEXT | Timestamp |
-| left_angle | REAL | Left knee angle |
-| right_angle | REAL | Right knee angle |
-| avg_angle | REAL | Average angle |
-| state | TEXT | State (STANDING/SQUATTING) |
-| rep_count | INTEGER | Rep count |
+文档: https://developers.google.com/mediapipe/solutions/vision/pose_landmarker
 
-## Quality Score
-
-Scored 0-100 based on:
-
-| Metric | Weight | Criteria |
-|--------|--------|----------|
-| Depth | 30 pts | Min angle ≤70° = full points |
-| Consistency | 30 pts | Low std dev of angle ranges |
-| Smoothness | 20 pts | Low overall angle variation |
-| Reps | 20 pts | 10+ reps = full points |
-
-## Reference
-
-### MediaPipe Pose Landmarks
-
-Key landmark indices:
-- Left: HIP=23, KNEE=25, ANKLE=27
-- Right: HIP=24, KNEE=26, ANKLE=28
-
-Documentation: https://developers.google.com/mediapipe/solutions/vision/pose_landmarker
-
-### Angle Calculation
+### 角度计算
 
 ```python
 def calculate_angle(a, b, c):
-    """Calculate angle at point b formed by points a-b-c"""
+    """计算三点夹角（b为顶点）"""
     radians = math.atan2(c.y - b.y, c.x - b.x) - math.atan2(a.y - b.y, a.x - b.x)
     angle = abs(radians * 180.0 / math.pi)
     if angle > 180.0:
@@ -126,19 +94,21 @@ def calculate_angle(a, b, c):
     return angle
 ```
 
-## Troubleshooting
+---
 
-### Q: Chart shows square boxes instead of characters
-**A**: This is a font issue. The analysis module uses system fonts. Ensure your system has standard fonts installed.
+## 常见问题
 
-### Q: Low quality score
+### Q: 图表显示方块而非中文
+**A**: 字体问题，确保系统安装了标准字体。
+
+### Q: 质量得分低
 **A**: 
-- Squat deeper (knee angle < 90°)
-- Maintain consistent form across reps
-- Complete more reps (aim for 10+)
+- 蹲得更深（膝角<90°）
+- 保持每蹲姿势一致
+- 完成更多蹲数（目标10+）
 
-### Q: Export raw data
-**A**: Use SQLite tools to query `data/fitness_data.db`:
+### Q: 导出原始数据
+**A**: 使用SQLite工具查询：
 ```sql
 SELECT * FROM squat_records WHERE session_id = 3;
 ```
