@@ -15,7 +15,8 @@ from PIL import Image, ImageDraw, ImageFont
 from src.config import Config
 from src.database import Database
 from src.pose_detector import PoseDetector
-from src.squat_counter import SquatCounter, SquatMetrics
+from src.squat_counter import SquatCounter, SquatMetrics, PoseState
+from src.jumping_jack_counter import JumpingJackCounter, JumpingJackMetrics, JumpingJackState
 from src.form_analyzer import FormAnalyzer, FormAnalysis, Severity, StrictnessLevel
 from src.adaptive_threshold import AdaptiveThresholdManager
 
@@ -90,13 +91,14 @@ class DetectionWorker(QThread):
     """
     
     # 信号定义
-    frame_ready = pyqtSignal(np.ndarray)           # 新帧可用
-    metrics_updated = pyqtSignal(object)            # 指标更新 (SquatMetrics)
-    valid_count_updated = pyqtSignal(int, int)      # 有效计数更新 (valid_count, total_count)
-    feedback_updated = pyqtSignal(str, str)         # 反馈更新 (message, severity)
-    session_created = pyqtSignal(int)               # 会话已创建
-    error_occurred = pyqtSignal(str)                # 错误发生
-    camera_info = pyqtSignal(str, int, int, int)    # 摄像头信息 (状态, 宽, 高, FPS)
+    frame_ready = pyqtSignal(np.ndarray)
+    metrics_updated = pyqtSignal(object)
+    valid_count_updated = pyqtSignal(int, int)
+    feedback_updated = pyqtSignal(str, str)
+    session_created = pyqtSignal(int)
+    error_occurred = pyqtSignal(str)
+    camera_info = pyqtSignal(str, int, int, int)
+    exercise_type_changed = pyqtSignal(str)
     
     def __init__(self, parent=None):
         """初始化检测工作线程"""
@@ -132,6 +134,7 @@ class DetectionWorker(QThread):
         # 配置
         self._rotate_frame = True
         self._camera_index = Config.CAMERA_INDEX
+        self._exercise_type = Config.DEFAULT_EXERCISE_TYPE
         self._threshold_manager = AdaptiveThresholdManager()
         self._threshold_calibration_interval = 300
         self._last_threshold_calibration_frame = 0
@@ -156,9 +159,12 @@ class DetectionWorker(QThread):
     
     def set_camera_index(self, index: int):
         self._camera_index = index
-    
+
     def set_rotate_frame(self, rotate: bool):
         self._rotate_frame = rotate
+
+    def set_exercise_type(self, exercise_type: str):
+        self._exercise_type = exercise_type
     
     def run(self):
         """主循环：捕获 -> 检测 -> 发射信号"""
@@ -197,19 +203,25 @@ class DetectionWorker(QThread):
                 form_analysis = None
                 if pose_data:
                     self._pose_count += 1
-                    metrics = self._squat_counter.update(pose_data)
-                    
-                    current_time = time.time()
-                    form_analysis = self._form_analyzer.analyze(
-                        pose_data,
-                        metrics.avg_knee_angle,
-                        metrics.state,
-                        current_time
-                    )
-                    
-                    self._update_valid_count(metrics, form_analysis)
-                    self._emit_feedback(form_analysis)
-                    self._update_adaptive_threshold(metrics)
+
+                    if self._exercise_type == "jumping_jack" and self._jumping_jack_counter:
+                        metrics = self._jumping_jack_counter.update(pose_data)
+                    elif self._squat_counter:
+                        metrics = self._squat_counter.update(pose_data)
+
+                    if metrics:
+                        if self._squat_counter:
+                            current_time = time.time()
+                            form_analysis = self._form_analyzer.analyze(
+                                pose_data,
+                                metrics.avg_knee_angle,
+                                metrics.state,
+                                current_time
+                            )
+                            self._update_valid_count(metrics, form_analysis)
+                            self._emit_feedback(form_analysis)
+                            self._update_adaptive_threshold(metrics)
+
                     frame = self._render_landmarks(frame, pose_data, metrics, form_analysis)
                 
                 # 发射信号
@@ -227,23 +239,30 @@ class DetectionWorker(QThread):
             self._cleanup()
     
     def _init_components(self):
-        """初始化检测组件"""
         self._database = Database()
-        
+
         try:
             self._pose_detector = PoseDetector()
         except FileNotFoundError as e:
             self.error_occurred.emit(f"模型文件错误: {e}")
             raise
-        
+
         self._session_id = self._database.create_session()
         self.session_created.emit(self._session_id)
-        
-        self._squat_counter = SquatCounter(
-            database=self._database,
-            session_id=self._session_id,
-        )
-        
+
+        if self._exercise_type == "jumping_jack":
+            self._squat_counter = None
+            self._jumping_jack_counter = JumpingJackCounter(
+                database=self._database,
+                session_id=self._session_id,
+            )
+        else:
+            self._squat_counter = SquatCounter(
+                database=self._database,
+                session_id=self._session_id,
+            )
+            self._jumping_jack_counter = None
+
         self._form_analyzer = FormAnalyzer()
     
     def _init_camera(self):
@@ -354,46 +373,45 @@ class DetectionWorker(QThread):
         return StrictnessLevel.NORMAL
     
     def _get_severity_from_color(self, color: tuple) -> int:
-        """根据颜色获取严重程度数值"""
-        if color == (0, 0, 255):      # 红色 - ERROR
+        if color == (0, 0, 255):
             return 3
-        elif color == (0, 165, 255):  # 橙色 - WARNING
+        elif color == (0, 165, 255):
             return 2
-        elif color == (0, 255, 255):  # 黄色 - INFO
+        elif color == (0, 255, 255):
             return 1
-        else:                          # 绿色 - OK
+        else:
             return 0
-    
+
     def _render_landmarks(
-        self, 
-        frame: np.ndarray, 
+        self,
+        frame: np.ndarray,
         pose_data: Optional[Dict],
-        metrics: SquatMetrics,
+        metrics,
         form_analysis: Optional[FormAnalysis] = None
     ) -> np.ndarray:
-        """渲染姿态关键点和骨骼，包含实时动作反馈"""
         if not pose_data:
             return frame
-        
+
         normalized_landmarks = pose_data.get('normalized')
         if not normalized_landmarks:
             return frame
-        
+
         h, w = frame.shape[:2]
         person_landmarks = normalized_landmarks[0]
-        
-        # 根据分析结果确定骨骼颜色
-        skeleton_color = (0, 255, 0)  # 默认绿色
+
+        if self._exercise_type == "jumping_jack":
+            return self._render_jumping_jack(frame, person_landmarks, metrics, h, w)
+
+        skeleton_color = (0, 255, 0)
         if form_analysis:
             severity = form_analysis.overall_severity
             if severity == Severity.ERROR:
-                skeleton_color = (0, 0, 255)      # 红色 - 错误
+                skeleton_color = (0, 0, 255)
             elif severity == Severity.WARNING:
-                skeleton_color = (0, 165, 255)    # 橙色 - 警告
+                skeleton_color = (0, 165, 255)
             elif severity == Severity.INFO:
-                skeleton_color = (0, 255, 255)    # 黄色 - 提示
-        
-        # 绘制骨骼连线
+                skeleton_color = (0, 255, 255)
+
         for connection in Config.SQUAT_CONNECTIONS:
             idx1, idx2 = connection
             if idx1 < len(person_landmarks) and idx2 < len(person_landmarks):
@@ -402,14 +420,12 @@ class DetectionWorker(QThread):
                 x1, y1 = int(pt1.x * w), int(pt1.y * h)
                 x2, y2 = int(pt2.x * w), int(pt2.y * h)
                 cv2.line(frame, (x1, y1), (x2, y2), skeleton_color, 2)
-        
-        # 绘制关键点
+
         for landmark in person_landmarks:
             x = int(landmark.x * w)
             y = int(landmark.y * h)
             cv2.circle(frame, (x, y), 4, skeleton_color, -1)
-        
-        # 高亮问题关节
+
         if form_analysis:
             for fb in form_analysis.feedbacks:
                 if fb.joints_to_highlight and fb.severity in (Severity.WARNING, Severity.ERROR):
@@ -418,11 +434,9 @@ class DetectionWorker(QThread):
                         if joint_idx < len(person_landmarks):
                             jx = int(person_landmarks[joint_idx].x * w)
                             jy = int(person_landmarks[joint_idx].y * h)
-                            # 绘制高亮圆圈
                             cv2.circle(frame, (jx, jy), 12, highlight_color, 2)
                             cv2.circle(frame, (jx, jy), 16, highlight_color, 1)
-        
-        # 绘制计数
+
         frame = put_chinese_text(
             frame,
             f"深蹲: {metrics.rep_count}",
@@ -430,8 +444,7 @@ class DetectionWorker(QThread):
             font_size=32,
             color=(0, 255, 0)
         )
-        
-        # 绘制峰值检测计数（调试用）
+
         if hasattr(metrics, 'peak_count') and metrics.peak_count > 0:
             frame = put_chinese_text(
                 frame,
@@ -440,8 +453,7 @@ class DetectionWorker(QThread):
                 font_size=20,
                 color=(0, 200, 255)
             )
-        
-        # 绘制状态
+
         state_y = 130 if hasattr(metrics, 'peak_count') and metrics.peak_count > 0 else 90
         state_color = (0, 255, 0) if metrics.state.value == "STANDING" else (0, 165, 255)
         state_text = "站立" if metrics.state.value == "STANDING" else "下蹲"
@@ -452,8 +464,7 @@ class DetectionWorker(QThread):
             font_size=24,
             color=state_color
         )
-        
-        # 绘制角度信息
+
         angle_y = state_y + 40
         frame = put_chinese_text(
             frame,
@@ -462,7 +473,90 @@ class DetectionWorker(QThread):
             font_size=20,
             color=(200, 200, 200)
         )
+
+        return frame
+
+    def _render_jumping_jack(
+        self,
+        frame: np.ndarray,
+        person_landmarks,
+        metrics: JumpingJackMetrics,
+        h: int,
+        w: int
+    ) -> np.ndarray:
+        skeleton_color = (0, 255, 0)
+
+        for connection in Config.JUMPING_JACK_CONNECTIONS:
+            idx1, idx2 = connection
+            if idx1 < len(person_landmarks) and idx2 < len(person_landmarks):
+                pt1 = person_landmarks[idx1]
+                pt2 = person_landmarks[idx2]
+                x1, y1 = int(pt1.x * w), int(pt1.y * h)
+                x2, y2 = int(pt2.x * w), int(pt2.y * h)
+                cv2.line(frame, (x1, y1), (x2, y2), skeleton_color, 2)
+
+        for landmark in person_landmarks:
+            x = int(landmark.x * w)
+            y = int(landmark.y * h)
+            cv2.circle(frame, (x, y), 4, skeleton_color, -1)
+
+        frame = put_chinese_text(
+            frame,
+            f"开合跳: {metrics.rep_count}",
+            (20, 50),
+            font_size=32,
+            color=(0, 255, 0)
+        )
+
+        # 显示校准状态
+        if hasattr(metrics, 'is_calibrated') and not metrics.is_calibrated:
+            progress = self._jumping_jack_counter.calibration_progress if self._jumping_jack_counter else 0
+            frame = put_chinese_text(
+                frame,
+                f"校准中: {progress*100:.0f}%",
+                (20, 90),
+                font_size=20,
+                color=(0, 255, 255)
+            )
+            state_y = 130
+        else:
+            state_y = 90
         
+        state_color = (0, 255, 0) if metrics.state.value == "OPEN" else (0, 165, 255)
+        state_text = "开合" if metrics.state.value == "OPEN" else "并拢"
+        frame = put_chinese_text(
+            frame,
+            f"状态: {state_text}",
+            (20, state_y),
+            font_size=24,
+            color=state_color
+        )
+
+        # 显示踝距和腕高（调试信息）
+        frame = put_chinese_text(
+            frame,
+            f"踝距: {metrics.ankle_distance:.2f}",
+            (20, state_y + 40),
+            font_size=18,
+            color=(180, 180, 180)
+        )
+
+        frame = put_chinese_text(
+            frame,
+            f"腕高: {metrics.wrist_height:.2f}",
+            (20, state_y + 65),
+            font_size=18,
+            color=(180, 180, 180)
+        )
+
+        frame = put_chinese_text(
+            frame,
+            f"开合比: {metrics.open_ratio:.2f}",
+            (20, state_y + 90),
+            font_size=18,
+            color=(180, 180, 180)
+        )
+
         return frame
     
     def pause(self):
@@ -477,6 +571,8 @@ class DetectionWorker(QThread):
     def reset_count(self):
         if self._squat_counter:
             self._squat_counter.reset()
+        if self._jumping_jack_counter:
+            self._jumping_jack_counter.reset()
         if self._form_analyzer:
             self._form_analyzer.reset()
         self._threshold_manager.reset()
@@ -490,26 +586,36 @@ class DetectionWorker(QThread):
         self._feedback_show_start = 0
     
     def _cleanup(self):
-        """清理资源"""
         if self._cap:
             self._cap.release()
             self._cap = None
-        
+
         if self._squat_counter:
             self._squat_counter.close()
-        
+
+        if self._jumping_jack_counter:
+            self._jumping_jack_counter.close()
+
+        count = 0
+        if self._squat_counter:
+            count = self._squat_counter.count
+        elif self._jumping_jack_counter:
+            count = self._jumping_jack_counter.count
+
         if self._database and self._session_id:
             self._database.update_session(
                 self._session_id,
                 self._frame_count,
-                self._squat_counter.count if self._squat_counter else 0
+                count
             )
-        
+
         if self._pose_detector:
             self._pose_detector.close()
             self._pose_detector = None
-        
+
         print(f"\n检测线程已停止")
         print(f"总帧数: {self._frame_count}, 检测到姿态: {self._pose_count}")
         if self._squat_counter:
             print(f"深蹲计数: {self._squat_counter.count}")
+        elif self._jumping_jack_counter:
+            print(f"开合跳计数: {self._jumping_jack_counter.count}")
