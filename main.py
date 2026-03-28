@@ -104,11 +104,13 @@ class FitnessPoseValidator:
     
     def _init_visualizer(self) -> None:
         """初始化可视化渲染器"""
-        self._visualizer = Visualizer(self._frame_width, self._frame_height)
-        
+        self._visualizer = Visualizer(self._frame_width, self._frame_height, dark_mode=True)
+
         # 创建显示窗口
         cv2.namedWindow(Config.WINDOW_TITLE, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(Config.WINDOW_TITLE, *Config.WINDOW_SIZE)
+        # 设置深色背景
+        cv2.setBackgroundColor(0, 0, 0)
         
         print(f"\n按 'q' 或 'ESC' 键退出程序")
     
