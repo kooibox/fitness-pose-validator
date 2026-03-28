@@ -79,7 +79,7 @@ class Config:
     DEFAULT_PASSWORD: str = "demo123"
     
     # ========== 运动类型 ==========
-    EXERCISE_TYPES: Tuple[str, ...] = ("squat", "pushup", "lunge")
+    EXERCISE_TYPES: Tuple[str, ...] = ("squat", "pushup", "lunge", "jumping_jack")
     DEFAULT_EXERCISE_TYPE: str = "squat"
     
     # ========== MediaPipe 关键点索引 ==========
@@ -119,6 +119,24 @@ class Config:
         (24, 26),
         (26, 28),
     )
+
+    # ========== 开合跳配置 ==========
+    JUMPING_JACK_CONNECTIONS: Tuple[Tuple[int, int], ...] = (
+        (11, 13), (13, 15),  # 左臂
+        (12, 14), (14, 16),  # 右臂
+        (23, 25), (25, 27),  # 左腿
+        (24, 26), (26, 28),  # 右腿
+        (23, 24),            # 髋部连接
+    )
+
+    # 开合跳阈值（基于腿部/手臂与垂直线的夹角）
+    # 髋角度：大腿与垂直线的夹角（双腿并拢~0°，分开~30-50°）
+    CLOSED_HIP_THRESHOLD: float = 15.0       # 双腿并拢：角度 < 15°
+    OPEN_HIP_THRESHOLD: float = 25.0         # 双腿分开：角度 > 25°
+    
+    # 肩角度：上臂与垂直线的夹角（手臂下垂~0°，侧平举~90°，上举~180°）
+    CLOSED_SHOULDER_THRESHOLD: float = 30.0  # 手臂下垂：角度 < 30°
+    OPEN_SHOULDER_THRESHOLD: float = 100.0   # 手臂举起：角度 > 100°
 
 
 config = Config()

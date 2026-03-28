@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from gui.pages.training_page import TrainingPage
 from gui.pages.history_page import HistoryPage
 from gui.pages.settings_page import SettingsPage
-from gui.resources.styles.fresh_theme import apply_theme
+from gui.resources.styles.dark_theme import apply_dark_theme
 
 
 class MainWindow(QMainWindow):
@@ -33,8 +33,8 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(QSize(1200, 800))
         self.resize(1400, 900)
         
-        # 应用主题
-        apply_theme(self)
+        # 应用深色霓虹主题
+        apply_dark_theme(self)
         
         # 初始化 UI
         self._init_ui()

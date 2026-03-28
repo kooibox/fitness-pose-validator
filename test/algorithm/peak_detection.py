@@ -136,7 +136,7 @@ if __name__ == "__main__":
     if args.csv:
         csv_path = args.csv
     else:
-        csv_path = os.path.join(script_dir, "..", "data", "samples", "debug_records.csv")
+        csv_path = os.path.join(script_dir, "..", "data", "samples", "squat", "debug_records.csv")
 
     if not os.path.exists(csv_path):
         print(f"错误: CSV文件不存在: {csv_path}")

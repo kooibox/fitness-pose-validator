@@ -31,11 +31,11 @@ class VideoWidget(QLabel):
             }
         """)
         
-        self.setText("🎥 点击开始训练")
+        self.setText("🎥  点击开始训练")
         self.setStyleSheet(self.styleSheet() + """
             QLabel {
                 color: #94A3B8;
-                font-size: 18px;
+                font-size: 24px;
             }
         """)
         

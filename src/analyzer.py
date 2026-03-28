@@ -37,6 +37,7 @@ class SessionAnalysis:
     session: Session
     total_records: int
     total_squats: int
+    valid_count: int
     duration_seconds: float
     avg_angle: float
     min_angle: float
@@ -95,11 +96,13 @@ class TrainingAnalyzer:
         reps = self._identify_reps(records)
         duration = self._calculate_duration(records)
         quality_score = self._calculate_quality_score(reps, angles)
+        valid_count = self._calculate_valid_count(reps)
         
         return SessionAnalysis(
             session=session,
             total_records=total_records,
             total_squats=len(reps),
+            valid_count=valid_count,
             duration_seconds=duration,
             avg_angle=sum(angles) / len(angles),
             min_angle=min(angles),
@@ -179,6 +182,11 @@ class TrainingAnalyzer:
         start_dt = datetime.fromisoformat(records[0].timestamp)
         end_dt = datetime.fromisoformat(records[-1].timestamp)
         return (end_dt - start_dt).total_seconds()
+    
+    def _calculate_valid_count(self, reps: List[SquatRep]) -> int:
+        """Calculate valid squat count based on depth threshold"""
+        valid_threshold = 110.0
+        return sum(1 for rep in reps if rep.min_angle <= valid_threshold)
     
     def _std_dev(self, values: List[float]) -> float:
         """Calculate standard deviation"""

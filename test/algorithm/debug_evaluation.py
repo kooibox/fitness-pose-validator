@@ -295,7 +295,7 @@ def debug_test(duration: int = 60, rotate: bool = True, adaptive: bool = False):
     cv2.destroyAllWindows()
     pose_detector.close()
 
-    output_dir = PROJECT_ROOT / "test" / "data" / "samples"
+    output_dir = PROJECT_ROOT / "test" / "data" / "samples" / "squat"
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / "debug_records.csv"
 

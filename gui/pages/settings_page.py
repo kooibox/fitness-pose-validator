@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.config import Config
+from gui.resources.styles.dark_theme import NeonColors
 
 
 class SettingRow(QWidget):
@@ -35,7 +36,7 @@ class SettingRow(QWidget):
         row.setSpacing(12)
         
         label_widget = QLabel(label)
-        label_widget.setStyleSheet("color: #334155; font-weight: 500;")
+        label_widget.setStyleSheet(f"color: {NeonColors.TEXT_SECONDARY}; font-weight: 500;")
         row.addWidget(label_widget)
         
         row.addStretch()
@@ -47,7 +48,7 @@ class SettingRow(QWidget):
         
         if description:
             desc_label = QLabel(description)
-            desc_label.setStyleSheet("color: #94A3B8; font-size: 12px;")
+            desc_label.setStyleSheet(f"color: {NeonColors.TEXT_MUTED}; font-size: 12px;")
             layout.addWidget(desc_label)
 
 
@@ -74,6 +75,7 @@ class SliderWithLabel(QWidget):
         self._label = QLabel()
         self._label.setMinimumWidth(50)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._label.setStyleSheet(f"color: {NeonColors.TEXT_PRIMARY};")
         self._update_label(default_val)
         layout.addWidget(self._label)
         
@@ -111,26 +113,26 @@ class CategoryButton(QPushButton):
         self.setCheckable(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(48)
-        self.setStyleSheet("""
-            QPushButton {
+        self.setStyleSheet(f"""
+            QPushButton {{
                 background-color: transparent;
-                color: #475569;
+                color: {NeonColors.TEXT_SECONDARY};
                 border: none;
                 border-radius: 8px;
                 padding: 12px 16px;
                 text-align: left;
                 font-size: 14px;
                 font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: #F1F5F9;
-                color: #1E293B;
-            }
-            QPushButton:checked {
-                background-color: #D1FAE5;
-                color: #059669;
+            }}
+            QPushButton:hover {{
+                background-color: {NeonColors.BG_ELEVATED};
+                color: {NeonColors.TEXT_PRIMARY};
+            }}
+            QPushButton:checked {{
+                background-color: rgba(34, 197, 94, 0.2);
+                color: {NeonColors.NEON_GREEN};
                 font-weight: 600;
-            }
+            }}
         """)
     
     def setActive(self, active: bool):
@@ -165,11 +167,11 @@ class SettingsPage(QWidget):
     def _create_sidebar(self) -> QWidget:
         sidebar = QFrame()
         sidebar.setFixedWidth(220)
-        sidebar.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border-right: 1px solid #E2E8F0;
-            }
+        sidebar.setStyleSheet(f"""
+            QFrame {{
+                background-color: {NeonColors.BG_SECONDARY};
+                border-right: 1px solid {NeonColors.BORDER_SUBTLE};
+            }}
         """)
         
         layout = QVBoxLayout(sidebar)
@@ -177,10 +179,10 @@ class SettingsPage(QWidget):
         layout.setSpacing(8)
         
         title = QLabel("设置")
-        title.setStyleSheet("""
+        title.setStyleSheet(f"""
             font-size: 20px;
             font-weight: 700;
-            color: #0F172A;
+            color: {NeonColors.TEXT_PRIMARY};
             margin-bottom: 8px;
         """)
         layout.addWidget(title)
@@ -206,20 +208,20 @@ class SettingsPage(QWidget):
         layout.addStretch()
         
         reset_btn = QPushButton("🔄 恢复默认")
-        reset_btn.setStyleSheet("""
-            QPushButton {
+        reset_btn.setStyleSheet(f"""
+            QPushButton {{
                 background-color: transparent;
-                color: #64748B;
-                border: 1px solid #E2E8F0;
+                color: {NeonColors.TEXT_MUTED};
+                border: 1px solid {NeonColors.BORDER_SUBTLE};
                 border-radius: 8px;
                 padding: 10px 16px;
                 font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #FEF2F2;
-                border-color: #FECACA;
-                color: #DC2626;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: rgba(239, 68, 68, 0.1);
+                border-color: {NeonColors.NEON_RED};
+                color: {NeonColors.NEON_RED};
+            }}
         """)
         reset_btn.clicked.connect(self._reset_to_default)
         layout.addWidget(reset_btn)
@@ -228,34 +230,34 @@ class SettingsPage(QWidget):
     
     def _create_content_area(self) -> QWidget:
         content = QFrame()
-        content.setStyleSheet("background-color: #F8FAFC;")
+        content.setStyleSheet(f"background-color: {NeonColors.BG_PRIMARY};")
         
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 0, 0)
         
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("""
-            QScrollArea {
+        scroll.setStyleSheet(f"""
+            QScrollArea {{
                 border: none;
                 background-color: transparent;
-            }
-            QScrollBar:vertical {
+            }}
+            QScrollBar:vertical {{
                 background-color: transparent;
                 width: 8px;
                 margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #CBD5E1;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {NeonColors.BORDER_DEFAULT};
                 border-radius: 4px;
                 min-height: 40px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #94A3B8;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {NeonColors.BORDER_HOVER};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0;
-            }
+            }}
         """)
         
         self._stack = QStackedWidget()
@@ -328,11 +330,36 @@ class SettingsPage(QWidget):
         row2 = SettingRow("下蹲阈值", self._squat_threshold, "膝关节角度小于此值判定为下蹲")
         layout.addWidget(row2)
         
-        self._detection_confidence = SliderWithLabel(10, 100, int(Config.POSE_DETECTION_CONFIDENCE * 100), 
+        self._detection_confidence = SliderWithLabel(10, 100, int(Config.POSE_DETECTION_CONFIDENCE * 100),
                                                       format_str="{:.2f}")
         row3 = SettingRow("检测置信度", self._detection_confidence, "姿态检测的最小置信度阈值")
         layout.addWidget(row3)
-        
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setStyleSheet(f"background-color: {NeonColors.BORDER_SUBTLE};")
+        layout.addWidget(separator)
+
+        jumping_jack_title = QLabel("开合跳阈值")
+        jumping_jack_title.setStyleSheet(f"color: {NeonColors.TEXT_SECONDARY}; font-weight: 600; margin-top: 8px;")
+        layout.addWidget(jumping_jack_title)
+
+        self._closed_hip_threshold = SliderWithLabel(10, 60, int(Config.CLOSED_HIP_THRESHOLD), "°")
+        row4 = SettingRow("并拢髋角", self._closed_hip_threshold, "双腿并拢时的髋关节角度阈值")
+        layout.addWidget(row4)
+
+        self._open_hip_threshold = SliderWithLabel(40, 100, int(Config.OPEN_HIP_THRESHOLD), "°")
+        row5 = SettingRow("分开髋角", self._open_hip_threshold, "双腿分开时的髋关节角度阈值")
+        layout.addWidget(row5)
+
+        self._closed_shoulder_threshold = SliderWithLabel(20, 80, int(Config.CLOSED_SHOULDER_THRESHOLD), "°")
+        row6 = SettingRow("下垂肩角", self._closed_shoulder_threshold, "双臂下垂时的肩关节角度阈值")
+        layout.addWidget(row6)
+
+        self._open_shoulder_threshold = SliderWithLabel(100, 180, int(Config.OPEN_SHOULDER_THRESHOLD), "°")
+        row7 = SettingRow("上举肩角", self._open_shoulder_threshold, "双臂上举时的肩关节角度阈值")
+        layout.addWidget(row7)
+
         layout.addStretch()
         
         return page
@@ -354,6 +381,10 @@ class SettingsPage(QWidget):
         self._show_chart = QCheckBox("显示角度曲线图")
         self._show_chart.setChecked(True)
         layout.addWidget(self._show_chart)
+        
+        self._show_feedback = QCheckBox("显示动作反馈")
+        self._show_feedback.setChecked(True)
+        layout.addWidget(self._show_feedback)
         
         layout.addStretch()
         
@@ -411,7 +442,7 @@ class SettingsPage(QWidget):
         status_layout.setContentsMargins(0, 0, 0, 0)
         
         self._login_status = QLabel("● 未登录")
-        self._login_status.setStyleSheet("color: #EF4444; font-weight: 500;")
+        self._login_status.setStyleSheet(f"color: {NeonColors.NEON_RED}; font-weight: 500;")
         status_layout.addWidget(self._login_status)
         status_layout.addStretch()
         
@@ -422,57 +453,60 @@ class SettingsPage(QWidget):
         btn_row.addStretch()
         
         self._login_btn = QPushButton("登录")
+        self._login_btn.setToolTip("使用账号密码登录服务器")
         self._login_btn.setMinimumHeight(36)
         self._login_btn.setMinimumWidth(100)
-        self._login_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10B981;
+        self._login_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {NeonColors.NEON_GREEN};
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: #059669;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {NeonColors.NEON_GREEN_INTENSE};
+            }}
         """)
         self._login_btn.clicked.connect(self._handle_login)
         btn_row.addWidget(self._login_btn)
         
         self._test_btn = QPushButton("测试连接")
+        self._test_btn.setToolTip("测试服务器连接是否正常")
         self._test_btn.setMinimumHeight(36)
-        self._test_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #3B82F6;
+        self._test_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {NeonColors.NEON_BLUE};
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: #2563EB;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {NeonColors.NEON_BLUE_INTENSE};
+            }}
         """)
         self._test_btn.clicked.connect(self._test_server_connection)
         btn_row.addWidget(self._test_btn)
         
         self._logout_btn = QPushButton("登出")
+        self._logout_btn.setToolTip("退出当前登录账号")
         self._logout_btn.setMinimumHeight(36)
         self._logout_btn.setMinimumWidth(100)
-        self._logout_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #EF4444;
+        self._logout_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {NeonColors.NEON_RED};
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-weight: 500;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: #DC2626;
-            }
+            }}
         """)
         self._logout_btn.clicked.connect(self._handle_logout)
         self._logout_btn.setVisible(False)
@@ -490,11 +524,11 @@ class SettingsPage(QWidget):
     
     def _create_save_bar(self) -> QWidget:
         bar = QFrame()
-        bar.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border-top: 1px solid #E2E8F0;
-            }
+        bar.setStyleSheet(f"""
+            QFrame {{
+                background-color: {NeonColors.BG_SECONDARY};
+                border-top: 1px solid {NeonColors.BORDER_SUBTLE};
+            }}
         """)
         bar.setFixedHeight(72)
         
@@ -505,18 +539,18 @@ class SettingsPage(QWidget):
         
         save_btn = QPushButton("保存设置")
         save_btn.setMinimumSize(140, 44)
-        save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10B981;
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {NeonColors.NEON_GREEN};
                 color: white;
                 border: none;
                 border-radius: 8px;
                 font-weight: 600;
                 font-size: 15px;
-            }
-            QPushButton:hover {
-                background-color: #059669;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {NeonColors.NEON_GREEN_INTENSE};
+            }}
         """)
         save_btn.clicked.connect(self._save_settings)
         layout.addWidget(save_btn)
@@ -597,12 +631,12 @@ class SettingsPage(QWidget):
     def _update_login_status(self, is_logged_in: bool, username: Optional[str] = None):
         if is_logged_in:
             self._login_status.setText(f"● 已登录 ({username})")
-            self._login_status.setStyleSheet("color: #10B981; font-weight: 500;")
+            self._login_status.setStyleSheet(f"color: {NeonColors.NEON_GREEN}; font-weight: 500;")
             self._login_btn.setVisible(False)
             self._logout_btn.setVisible(True)
         else:
             self._login_status.setText("● 未登录")
-            self._login_status.setStyleSheet("color: #EF4444; font-weight: 500;")
+            self._login_status.setStyleSheet(f"color: {NeonColors.NEON_RED}; font-weight: 500;")
             self._login_btn.setVisible(True)
             self._logout_btn.setVisible(False)
     
@@ -673,6 +707,15 @@ class SettingsPage(QWidget):
             self._squat_threshold.setValue(self._settings["squat_threshold"])
         if "detection_confidence" in self._settings:
             self._detection_confidence.setValue(int(self._settings["detection_confidence"] * 100))
+
+        if "closed_hip_threshold" in self._settings:
+            self._closed_hip_threshold.setValue(self._settings["closed_hip_threshold"])
+        if "open_hip_threshold" in self._settings:
+            self._open_hip_threshold.setValue(self._settings["open_hip_threshold"])
+        if "closed_shoulder_threshold" in self._settings:
+            self._closed_shoulder_threshold.setValue(self._settings["closed_shoulder_threshold"])
+        if "open_shoulder_threshold" in self._settings:
+            self._open_shoulder_threshold.setValue(self._settings["open_shoulder_threshold"])
         
         if "show_skeleton" in self._settings:
             self._show_skeleton.setChecked(self._settings["show_skeleton"])
@@ -704,18 +747,23 @@ class SettingsPage(QWidget):
             "resolution": self._resolution.currentText(),
             "fps": self._fps.value(),
             "rotate_frame": self._rotate_frame.isChecked(),
-            
+
             "standing_threshold": self._standing_threshold.value(),
             "squat_threshold": self._squat_threshold.value(),
             "detection_confidence": self._detection_confidence.value() / 100,
-            
+
+            "closed_hip_threshold": self._closed_hip_threshold.value(),
+            "open_hip_threshold": self._open_hip_threshold.value(),
+            "closed_shoulder_threshold": self._closed_shoulder_threshold.value(),
+            "open_shoulder_threshold": self._open_shoulder_threshold.value(),
+
             "show_skeleton": self._show_skeleton.isChecked(),
             "show_angles": self._show_angles.isChecked(),
             "show_chart": self._show_chart.isChecked(),
-            
+
             "db_path": self._db_path.text(),
             "buffer_size": self._buffer_size.value(),
-            
+
             "server_url": self._server_url.text(),
             "username": self._username.text(),
             "auto_upload": self._auto_upload.isChecked(),
@@ -752,6 +800,11 @@ class SettingsPage(QWidget):
             self._standing_threshold.setValue(int(Config.STANDING_ANGLE_THRESHOLD))
             self._squat_threshold.setValue(int(Config.SQUAT_ANGLE_THRESHOLD))
             self._detection_confidence.setValue(int(Config.POSE_DETECTION_CONFIDENCE * 100))
+
+            self._closed_hip_threshold.setValue(int(Config.CLOSED_HIP_THRESHOLD))
+            self._open_hip_threshold.setValue(int(Config.OPEN_HIP_THRESHOLD))
+            self._closed_shoulder_threshold.setValue(int(Config.CLOSED_SHOULDER_THRESHOLD))
+            self._open_shoulder_threshold.setValue(int(Config.OPEN_SHOULDER_THRESHOLD))
             
             self._show_skeleton.setChecked(True)
             self._show_angles.setChecked(True)

@@ -92,6 +92,23 @@ class Database:
                     FOREIGN KEY (session_id) REFERENCES sessions(id)
                 )
             """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS jumping_jack_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    left_hip_angle REAL,
+                    right_hip_angle REAL,
+                    avg_hip_angle REAL,
+                    left_shoulder_angle REAL,
+                    right_shoulder_angle REAL,
+                    avg_shoulder_angle REAL,
+                    state TEXT,
+                    rep_count INTEGER,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """)
             
             conn.commit()
     
@@ -151,22 +168,48 @@ class Database:
     def insert_records(self, records: List[tuple]) -> None:
         """
         批量插入深蹲记录。
-        
+
         Args:
             records: 记录元组列表，每个元组格式为
-                     (session_id, timestamp, left_angle, right_angle, 
+                     (session_id, timestamp, left_angle, right_angle,
                       avg_angle, state, rep_count)
         """
         if not records:
             return
-            
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.executemany(
                 """
-                INSERT INTO squat_records 
+                INSERT INTO squat_records
                 (session_id, timestamp, left_angle, right_angle, avg_angle, state, rep_count)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                records
+            )
+            conn.commit()
+
+    def insert_jumping_jack_records(self, records: List[tuple]) -> None:
+        """
+        批量插入开合跳记录。
+
+        Args:
+            records: 记录元组列表，每个元组格式为
+                     (session_id, timestamp, left_hip_angle, right_hip_angle,
+                      avg_hip_angle, left_shoulder_angle, right_shoulder_angle,
+                      avg_shoulder_angle, state, rep_count)
+        """
+        if not records:
+            return
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(
+                """
+                INSERT INTO jumping_jack_records
+                (session_id, timestamp, left_hip_angle, right_hip_angle, avg_hip_angle,
+                 left_shoulder_angle, right_shoulder_angle, avg_shoulder_angle, state, rep_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 records
             )
@@ -220,42 +263,52 @@ class Database:
         """删除训练会话及其所有记录。"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            
+
             cursor.execute(
                 "DELETE FROM squat_records WHERE session_id = ?",
                 (session_id,)
             )
-            
+
+            cursor.execute(
+                "DELETE FROM jumping_jack_records WHERE session_id = ?",
+                (session_id,)
+            )
+
             cursor.execute(
                 "DELETE FROM sessions WHERE id = ?",
                 (session_id,)
             )
-            
+
             conn.commit()
-            
+
             return cursor.rowcount > 0
     
     def delete_sessions(self, session_ids: List[int]) -> int:
         """批量删除训练会话及其所有记录。"""
         if not session_ids:
             return 0
-        
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            
+
             placeholders = ','.join('?' * len(session_ids))
-            
+
             cursor.execute(
                 f"DELETE FROM squat_records WHERE session_id IN ({placeholders})",
                 session_ids
             )
-            
+
+            cursor.execute(
+                f"DELETE FROM jumping_jack_records WHERE session_id IN ({placeholders})",
+                session_ids
+            )
+
             cursor.execute(
                 f"DELETE FROM sessions WHERE id IN ({placeholders})",
                 session_ids
             )
-            
+
             deleted_count = cursor.rowcount
             conn.commit()
-        
+
         return deleted_count
