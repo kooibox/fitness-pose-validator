@@ -35,6 +35,8 @@ class RecordData(BaseModel):
     left_angle: Optional[float] = None
     right_angle: Optional[float] = None
     avg_angle: Optional[float] = None
+    hip_angle: Optional[float] = None
+    shoulder_angle: Optional[float] = None
     state: Optional[str] = None
     rep_count: Optional[int] = None
 
