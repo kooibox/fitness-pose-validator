@@ -630,7 +630,6 @@ class TrainingPage(QWidget):
         self._time_label.setText("00:00:00")
         self._fps_label.setText("30fps")
         self._video_widget.show_placeholder("🎥 训练已结束")
-
     def _reset_detection(self):
         if self._worker:
             self._worker.reset_count()
